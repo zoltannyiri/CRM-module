@@ -32,6 +32,7 @@ export const apiRequest = async (path, options = {}, accessToken) => {
 };
 
 export const authApi = {
+  invitation: (token) => apiRequest(`/auth/invitation/${token}`),
   login: (credentials) => apiRequest("/auth/login", {
     method: "POST",
     body: JSON.stringify(credentials),

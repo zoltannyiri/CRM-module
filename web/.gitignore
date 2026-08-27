@@ -25,3 +25,6 @@ dist-ssr
 *.env
 .env
 .env.development
+
+.userrequest
+userrequest
