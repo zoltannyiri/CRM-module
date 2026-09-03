@@ -6,89 +6,159 @@ datasource db {
   provider = "postgresql"
 }
 
-model Organization {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users       User[]
-  companies   Company[]
-  invitations Invitation[]
-}
-
-enum UserRole {
+enum OrganizationRole {
+  OWNER
   ADMIN
   USER
 }
 
+enum PartnerType {
+  COMPANY
+  PERSON
+}
+
+enum ModuleKey {
+  PARTNERS
+
+  PROJECTS
+  TASKS
+  DOCUMENTS
+  QUOTES
+
+  LEADS
+  PIPELINE
+  FOLLOW_UPS
+
+  LOCATIONS
+  DEVICES
+  WORK_ORDERS
+  MAINTENANCE
+}
+
+model Organization {
+  id   Int    @id @default(autoincrement())
+  name String
+  slug String @unique
+
+  members     OrganizationMember[]
+  partners    Partner[]
+  invitations Invitation[]
+  modules     OrganizationModule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model User {
-  id             Int          @id @default(autoincrement())
-  email          String       @unique
-  passwordHash   String
-  firstName      String
-  lastName       String
-  role           UserRole     @default(USER)
+  id           Int    @id @default(autoincrement())
+  email        String @unique
+  passwordHash String
+  firstName    String
+  lastName     String
 
+  memberships OrganizationMember[]
+  sessions    Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrganizationMember {
+  id             Int              @id @default(autoincrement())
+  userId         Int
   organizationId Int
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  role           OrganizationRole @default(USER)
 
-  sessions       Session[]
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
 }
 
-model Session {
-  id               String    @id @default(cuid())
-  refreshTokenHash String    @unique
-
-  userId           Int
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  lastUsedAt       DateTime  @default(now())
-  revokedAt        DateTime?
-}
-
-model Invitation {
-  id             Int          @id @default(autoincrement())
-  tokenHash      String       @unique
-
-  email          String?
-  role           UserRole     @default(USER)
+model OrganizationModule {
+  id Int @id @default(autoincrement())
 
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  expiresAt      DateTime
-  usedAt         DateTime?
+  module   ModuleKey
+  enabled  Boolean   @default(true)
+  settings Json?
 
-  createdAt      DateTime     @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, module])
+  @@index([organizationId])
 }
 
-model Company {
-  id             Int          @id @default(autoincrement())
-  name           String
-  email          String?
-  phone          String?
-  website        String?
-  taxNumber      String?
-  address        String?
-  note           String?
+model Session {
+  id               String @id @default(cuid())
+  refreshTokenHash String @unique
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  expiresAt  DateTime?
+
+  @@index([userId])
+}
+
+model Invitation {
+  id        Int    @id @default(autoincrement())
+  tokenHash String @unique
+
+  email String?
+  role  OrganizationRole @default(USER)
 
   organizationId Int
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  contacts       Contact[]
+  expiresAt DateTime
+  usedAt    DateTime?
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+}
+
+model Partner {
+  id Int @id @default(autoincrement())
+
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type PartnerType @default(COMPANY)
+
+  name      String
+  email     String?
+  phone     String?
+  website   String?
+  taxNumber String?
+  address   String?
+  note      String?
+
+  contacts Contact[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, name])
 }
 
 model Contact {
-  id        Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
+
   firstName String
   lastName  String
   email     String?
@@ -96,9 +166,11 @@ model Contact {
   position  String?
   note      String?
 
-  companyId Int
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  partnerId Int
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([partnerId])
 }
