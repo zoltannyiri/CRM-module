@@ -3,7 +3,7 @@ import partnerService from '../services/partnerService.js';
 async function getPartners(req, res, next) {
   try {
     const partners = await partnerService.getPartners({
-      organizationId: req.user.organizationId,
+      organizationId: req.organization.id,
     });
 
     return res.json(partners);
@@ -16,7 +16,7 @@ async function getPartnerById(req, res, next) {
   try {
     const partnerId = Number(req.params.id);
     const partner = await partnerService.getPartnerById({
-      organizationId: req.user.organizationId,
+      organizationId: req.organization.id,
       partnerId,
     });
 
@@ -39,13 +39,12 @@ async function createPartner(req, res, next) {
     }
 
     const partner = await partnerService.createPartner({
-      organizationId: req.user.organizationId,
+      organizationId: req.organization.id,
       name: name.trim(),
       phone,
       email,
       address,
       taxNumber,
-      address,
       note,
       website,
       type,
@@ -61,7 +60,7 @@ async function updatePartner(req, res, next) {
   try {
     const partnerId = Number(req.params.id);
     const partner = await partnerService.updatePartner({
-      organizationId: req.user.organizationId,
+      organizationId: req.organization.id,
       partnerId,
       data: req.body,
     });
@@ -80,7 +79,7 @@ async function deletePartner(req, res, next) {
   try {
     const partnerId = Number(req.params.id);
     const partner = await partnerService.deletePartner({
-      organizationId: req.user.organizationId,
+      organizationId: req.organization.id,
       partnerId,
     });
     if (!partner) {

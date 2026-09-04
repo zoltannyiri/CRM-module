@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 
 import prisma from "../lib/prisma.js";
+import { getDefaultMembership } from "./organizationService.js";
 
 import {
   generateAccessToken,
@@ -55,7 +56,7 @@ const createSession = async (user) => {
   return refreshToken;
 };
 
-const toPublicUser = (user, membership) => ({
+export const toPublicUser = (user, membership) => ({
   id: user.id,
   email: user.email,
   firstName: user.firstName,
@@ -97,7 +98,20 @@ const registerUser = async ({
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const user = await prisma.$transaction(async (transaction) => {
+  const { user, membership } = await prisma.$transaction(async (transaction) => {
+    const claimed = await transaction.invitation.updateMany({
+      where: {
+        id: invitation.id,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: { usedAt: new Date() },
+    });
+
+    if (claimed.count !== 1) {
+      throw new Error("A meghívó érvénytelen vagy lejárt.");
+    }
+
     const existingUser = await transaction.user.findUnique({
       where: {
         email: normalizedEmail,
@@ -128,26 +142,20 @@ const registerUser = async ({
       },
     });
 
-    await transaction.invitation.update({
-      where: {
-        id: invitation.id,
-      },
-      data: {
-        usedAt: new Date(),
-      },
-    });
-
-    return createdUser;
+    return { user: createdUser, membership };
   });
 
   return {
     accessToken: generateAccessToken(user),
     refreshToken: await createSession(user),
-    user: toPublicUser(user),
+    user: toPublicUser(user, membership),
   };
 };
 
 const loginUser = async ({ email, password }) => {
+  if (typeof email !== "string" || typeof password !== "string") {
+    throw new Error("Hibás email cím vagy jelszó.");
+  }
   const normalizedEmail = email.trim().toLowerCase();
 
   const user = await prisma.user.findUnique({
@@ -169,10 +177,12 @@ const loginUser = async ({ email, password }) => {
     throw new Error("Hibás email cím vagy jelszó.");
   }
 
+  const membership = await getDefaultMembership(user.id);
+
   return {
     accessToken: generateAccessToken(user),
     refreshToken: await createSession(user),
-    user: toPublicUser(user),
+    user: toPublicUser(user, membership),
   };
 };
 
@@ -191,7 +201,10 @@ const refreshAccessToken = async (refreshToken) => {
   });
 
   const sessionLifetime = 30 * 24 * 60 * 60 * 1000;
-  const expired = session && Date.now() - session.createdAt.getTime() > sessionLifetime;
+  const expired = session && (
+    Date.now() - session.createdAt.getTime() >= sessionLifetime ||
+    (session.expiresAt && session.expiresAt <= new Date())
+  );
 
   if (!session || session.revokedAt || expired) {
     throw new Error("Érvénytelen vagy lejárt refresh token.");
@@ -199,23 +212,29 @@ const refreshAccessToken = async (refreshToken) => {
 
   const nextRefreshToken = generateRefreshToken();
 
-  await prisma.$transaction([
-    prisma.session.update({
+  await prisma.$transaction(async (transaction) => {
+    const revoked = await transaction.session.updateMany({
       where: {
         id: session.id,
+        revokedAt: null,
       },
       data: {
         revokedAt: new Date(),
         lastUsedAt: new Date(),
       },
-    }),
-    prisma.session.create({
+    });
+
+    if (revoked.count !== 1) {
+      throw new Error("Érvénytelen vagy lejárt refresh token.");
+    }
+
+    await transaction.session.create({
       data: {
         userId: session.userId,
         refreshTokenHash: hashRefreshToken(nextRefreshToken),
       },
-    }),
-  ]);
+    });
+  });
 
   return {
     accessToken: generateAccessToken(session.user),

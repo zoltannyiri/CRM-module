@@ -49,45 +49,33 @@ async function createPartner({ organizationId, note, address, taxNumber, website
 }
 
 async function updatePartner({ organizationId, partnerId, data }) {
-  const partner = await prisma.partner.findFirst({
-    where: {
-      id: partnerId,
-      organizationId,
-    },
-  });
+  // Never accept tenant IDs, primary keys or nested relation writes from the body.
+  const fields = ["name", "email", "phone", "type", "address", "website", "taxNumber", "note"];
+  const changes = Object.fromEntries(
+    fields.filter((field) => Object.hasOwn(data, field)).map((field) => [field, data[field]])
+  );
 
-  if (!partner) {
-    throw new Error("Partner not found");
+  try {
+    return await prisma.partner.update({
+      where: { id: partnerId, organizationId },
+      data: changes,
+      include: { contacts: true },
+    });
+  } catch (error) {
+    if (error.code === "P2025") return null;
+    throw error;
   }
-
-  return prisma.partner.update({
-    where: {
-      id: partnerId,
-    },
-    data,
-    include: {
-      contacts: true,
-    }
-  })
 }
 
 async function deletePartner({ organizationId, partnerId }) {
-  const partner = await prisma.partner.findFirst({
-    where: {
-      id: partnerId,
-      organizationId,
-    },
-  });
-
-  if (!partner) {
-    throw new Error("Partner not found");
+  try {
+    return await prisma.partner.delete({
+      where: { id: partnerId, organizationId },
+    });
+  } catch (error) {
+    if (error.code === "P2025") return null;
+    throw error;
   }
-
-  return prisma.partner.delete({
-    where: {
-      id: partnerId,
-    },
-  });
 }
 
 export default {

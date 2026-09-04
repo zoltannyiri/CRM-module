@@ -1,15 +1,8 @@
-import prisma from '../lib/prisma.js';
+import { getDefaultMembership } from '../services/organizationService.js';
 
 const requireOrganization = async (req, res, next) => {
   try {
-    const membership = await prisma.organizationMember.findFirst({
-      where: {
-        userId: req.user.userId,
-      },
-      include: {
-        organization: true,
-      },
-    });
+    const membership = await getDefaultMembership(req.user.userId);
 
     if (!membership) {
       return res.status(403).json({

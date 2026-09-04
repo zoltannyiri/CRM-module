@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma.js";
-import authService from "../services/authService.js";
+import authService, { toPublicUser } from "../services/authService.js";
 import invitationService from "../services/invitationService.js";
 
 const refreshCookieOptions = {
@@ -81,16 +81,10 @@ export const me = async (req, res) => {
       });
     }
 
-    return res.json({
-      ...user,
-      role: req.membership.role,
-      organizationId: req.organization.id,
-      organization: {
-        id: req.organization.id,
-        name: req.organization.name,
-        slug: req.organization.slug,
-      },
-    });
+    return res.json(toPublicUser(user, {
+      ...req.membership,
+      organization: req.organization,
+    }));
   } catch (error) {
     return res.status(500).json({
       message: error.message,
@@ -102,8 +96,8 @@ export const createInvitation = async (req, res) => {
   try {
     const result = await invitationService.createInvitation({
       organizationId: req.organization.id,
-      email: req.body.email,
-      role: req.body.role || "USER",
+      email: req.body?.email,
+      role: req.body?.role || "USER",
     });
 
     return res.status(201).json(result);

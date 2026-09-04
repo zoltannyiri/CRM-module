@@ -17,6 +17,10 @@ const authMiddleware = (req, res, next) => {
       process.env.JWT_SECRET
     );
 
+    if (!Number.isSafeInteger(decoded.userId) || decoded.userId <= 0) {
+      throw new Error("Invalid user ID");
+    }
+
     req.user = decoded;
 
     next();
