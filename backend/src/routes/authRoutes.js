@@ -19,6 +19,6 @@ router.post("/logout", logout);
 
 router.get("/me", authMiddleware, requireOrganization, me);
 
-router.post("/invitations", authMiddleware, adminMiddleware, createInvitation);
+router.post("/invitations", authMiddleware, requireOrganization, adminMiddleware, createInvitation);
 
 export default router;

@@ -62,34 +62,40 @@ export const login = async (req, res) => {
 };
 
 export const me = async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: req.user.userId,
-    },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      organizationId: true,
-
-      organization: {
-        select: {
-          id: true,
-          name: true,
-        },
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: req.user.userId,
       },
-    },
-  });
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
 
-  if (!user) {
-    return res.status(404).json({
-      message: "Felhasználó nem található.",
+    if (!user) {
+      return res.status(404).json({
+        message: "Felhasználó nem található.",
+      });
+    }
+
+    return res.json({
+      ...user,
+      role: req.membership.role,
+      organizationId: req.organization.id,
+      organization: {
+        id: req.organization.id,
+        name: req.organization.name,
+        slug: req.organization.slug,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message,
     });
   }
-
-  return res.json(user);
 };
 
 export const createInvitation = async (req, res) => {

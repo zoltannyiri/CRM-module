@@ -55,13 +55,22 @@ const createSession = async (user) => {
   return refreshToken;
 };
 
-const toPublicUser = (user) => ({
+const toPublicUser = (user, membership) => ({
   id: user.id,
   email: user.email,
   firstName: user.firstName,
   lastName: user.lastName,
-  role: user.role,
-  organizationId: user.organizationId,
+
+  role: membership?.role ?? null,
+  organizationId: membership?.organizationId ?? null,
+
+  organization: membership?.organization
+    ? {
+        id: membership.organization.id,
+        name: membership.organization.name,
+        slug: membership.organization.slug,
+      }
+    : null,
 });
 
 const registerUser = async ({
@@ -105,8 +114,17 @@ const registerUser = async ({
         passwordHash,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        role: invitation.role,
+      },
+    });
+
+    const membership = await transaction.organizationMember.create({
+      data: {
+        userId: createdUser.id,
         organizationId: invitation.organizationId,
+        role: invitation.role,
+      },
+      include: {
+        organization: true,
       },
     });
 
