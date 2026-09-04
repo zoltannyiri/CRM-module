@@ -95,7 +95,7 @@ export const me = async (req, res) => {
 export const createInvitation = async (req, res) => {
   try {
     const result = await invitationService.createInvitation({
-      organizationId: req.user.organizationId,
+      organizationId: req.organization.id,
       email: req.body.email,
       role: req.body.role || "USER",
     });

@@ -1,5 +1,7 @@
 const adminMiddleware = (req, res, next) => {
-  if (req.user?.role !== "ADMIN") {
+  const role = req.membership?.role;
+
+  if (role !== "OWNER" && role !== "ADMIN") {
     return res.status(403).json({
       message: "Ehhez a művelethez admin jogosultság szükséges.",
     });
