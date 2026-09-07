@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
+import axios from 'axios';
 
 const iconPaths = {
   plus: <path d="M12 5v14M5 12h14" />,
@@ -13,9 +14,11 @@ function Icon({ name, className = "size-4" }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
 }
 
-export default function PartnerListComponent({ partners = [], onOpen }) {
+export default function PartnerListComponent({ onOpen }) {
+  const [partners, setPartners] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
   const rowsPerPage = 10;
 
   const pageCount = Math.max(1, Math.ceil(partners.length / rowsPerPage));
@@ -39,6 +42,36 @@ export default function PartnerListComponent({ partners = [], onOpen }) {
     return <div className="flex items-center gap-3"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f1f4f3] text-[11px] font-medium text-[#465458]">{initials}</span><button type="button" onClick={() => onOpen?.(partner)} className="cursor-pointer border-0 bg-transparent p-0 text-left text-xs font-medium text-[#263338] hover:underline">{partner.name}</button></div>;
   };
   const actionTemplate = (partner) => <button type="button" onClick={() => onOpen?.(partner)} aria-label={`${partner.name} műveletei`} className="mx-auto grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[#788487] hover:bg-[#eef1f0] hover:text-[#263338]"><Icon name="more" className="size-4" /></button>;
+
+  const loadPartners = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/partners`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }
+      );
+
+      console.log("RESPONSE:", response.data);
+
+      setPartners(response.data);
+    } catch (error) {
+      console.error(
+        "Error fetching partners:",
+        error.response?.data || error
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPartners();
+  }, []);
+
 
   return (
     <section className="bg-[#f3f5f6] px-5 pb-5" aria-label="Partnerlista">
