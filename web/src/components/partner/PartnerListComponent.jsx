@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
-import axios from 'axios';
+import apiClient from "../../api/apiClient.js";
 
 const iconPaths = {
   plus: <path d="M12 5v14M5 12h14" />,
@@ -14,16 +14,32 @@ function Icon({ name, className = "size-4" }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
 }
 
-export default function PartnerListComponent({ onOpen }) {
+export default function PartnerListComponent({ query = "", typeFilter = "ALL", sortDirection = "desc", onOpen }) {
   const [partners, setPartners] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const rowsPerPage = 10;
 
-  const pageCount = Math.max(1, Math.ceil(partners.length / rowsPerPage));
+  const filteredPartners = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("hu");
+    const filtered = partners.filter((partner) => {
+      const typeMatches = typeFilter === "ALL" || partner.type === typeFilter;
+      const contactName = partner.contacts?.[0]
+        ? `${partner.contacts[0].firstName} ${partner.contacts[0].lastName}`
+        : "";
+      const queryMatches = !needle || [partner.name, partner.email, partner.phone, partner.website, contactName]
+        .some((value) => value?.toLocaleLowerCase("hu").includes(needle));
+      return typeMatches && queryMatches;
+    });
+
+    return [...filtered].sort((a, b) => sortDirection === "asc" ? a.id - b.id : b.id - a.id);
+  }, [partners, query, sortDirection, typeFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredPartners.length / rowsPerPage));
   const currentPage = Math.min(page, pageCount);
-  const visible = partners.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const visible = filteredPartners.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
   const visibleIds = visible.map(({ id }) => id);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.includes(id));
 
@@ -43,33 +59,23 @@ export default function PartnerListComponent({ onOpen }) {
   };
   const actionTemplate = (partner) => <button type="button" onClick={() => onOpen?.(partner)} aria-label={`${partner.name} műveletei`} className="mx-auto grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[#788487] hover:bg-[#eef1f0] hover:text-[#263338]"><Icon name="more" className="size-4" /></button>;
 
-  const loadPartners = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/partners`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-          },
-        }
-      );
-
-      console.log("RESPONSE:", response.data);
-
-      setPartners(response.data);
-    } catch (error) {
-      console.error(
-        "Error fetching partners:",
-        error.response?.data || error
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadPartners();
+    let active = true;
+
+    apiClient.get("/partners")
+      .then(({ data }) => {
+        if (active) setPartners(data);
+      })
+      .catch((error) => {
+        if (active) setLoadError(error.message || "A partnerlista betöltése sikertelen.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
 
@@ -81,18 +87,19 @@ export default function PartnerListComponent({ onOpen }) {
         <DataTable
           value={visible}
           dataKey="id"
+          loading={loading}
           unstyled
           tableClassName="w-full min-w-[820px] border-collapse text-left"
           rowClassName={(partner) => `${selected.includes(partner.id) ? "bg-[#f5faf5]" : "bg-white"} hover:bg-[#fafcfc]`}
           onRowDoubleClick={(event) => onOpen?.(event.data)}
-          emptyMessage={<span className="block h-40 pt-16 text-center text-xs text-[#778286]">Nincs megjeleníthető partner.</span>}
+          emptyMessage={<span className="block h-40 pt-16 text-center text-xs text-[#778286]">{loadError || "Nincs megjeleníthető partner."}</span>}
         >
           <Column header={<input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Minden látható partner kijelölése" className="size-4 cursor-pointer rounded-sm accent-[#78ad7d]" />} body={checkboxTemplate} headerClassName={`${headerClass} w-14 px-5`} bodyClassName={`${cellClass} w-14 px-5`} />
           <Column field="name" header="Partner neve" body={partnerTemplate} headerClassName={`${headerClass} w-[26%]`} bodyClassName={`${cellClass} w-[26%]`} />
           <Column field="type" header="Típus" body={(partner) => partner.type === "COMPANY" ? "Cég" : "Magánszemély"} headerClassName={`${headerClass} w-[15%]`} bodyClassName={`${cellClass} w-[15%]`} />
           <Column field="email" header="Email" body={(partner) => partner.email || "—"} headerClassName={`${headerClass} w-[21%]`} bodyClassName={`${cellClass} w-[21%]`} />
           <Column field="phone" header="Telefon" body={(partner) => partner.phone || "—"} headerClassName={`${headerClass} w-[17%]`} bodyClassName={`${cellClass} w-[17%] whitespace-nowrap`} />
-          <Column field="mainContact" header="Kapcsolattartó" body={(partner) => partner.mainContact || "—"} headerClassName={`${headerClass} w-[18%]`} bodyClassName={`${cellClass} w-[18%]`} />
+          <Column field="contacts" header="Kapcsolattartó" body={(partner) => partner.contacts?.[0] ? `${partner.contacts[0].firstName} ${partner.contacts[0].lastName}` : "—"} headerClassName={`${headerClass} w-[18%]`} bodyClassName={`${cellClass} w-[18%]`} />
           <Column header={<span className="mx-auto grid size-[18px] place-items-center rounded-full bg-[#26393e] text-white"><Icon name="plus" className="size-3" /></span>} body={actionTemplate} headerClassName={`${headerClass} w-14 px-3 text-center`} bodyClassName={`${cellClass} w-14 px-3 text-center`} />
         </DataTable>
       </div>

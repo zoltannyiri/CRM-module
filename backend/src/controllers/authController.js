@@ -128,7 +128,7 @@ export const refresh = async (req, res) => {
     res.clearCookie("refreshToken", clearRefreshCookieOptions);
 
     return res.status(401).json({
-      message: error.message,
+      message: "Nincs érvényes munkamenet.",
     });
   }
 };

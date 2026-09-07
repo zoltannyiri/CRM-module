@@ -75,7 +75,7 @@ test("auth and tenant authorization HTTP integration", {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     assert.deepEqual(Object.keys(payload).sort(), ["exp", "iat", "userId"]);
     assert.equal(payload.userId, userId);
-    assert.equal(payload.exp - payload.iat, 900);
+    assert.equal(payload.exp - payload.iat, 1800);
   };
 
   try {
@@ -111,6 +111,8 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(login.body.user.passwordHash, undefined);
         assert.equal(login.body.refreshToken, undefined);
         assert.match(login.cookie, /HttpOnly/i);
+        assert.match(login.cookie, /Path=\/api\/auth/i);
+        assert.match(login.cookie, /SameSite=Lax/i);
         ownerToken = login.body.accessToken;
         refreshCookie = login.cookie.split(";")[0];
         checkToken(ownerToken, users.OWNER.id);
@@ -217,6 +219,7 @@ test("auth and tenant authorization HTTP integration", {
         const session = await tx.session.findUnique({ where: { refreshTokenHash: hashRefreshToken(raw) } });
         assert.ok(session);
         assert.notEqual(session.refreshTokenHash, raw);
+        assert.ok(session.expiresAt.getTime() > Date.now() + 29 * 24 * 60 * 60 * 1000);
         const refreshed = await request("/api/auth/refresh", { method: "POST", cookie: refreshCookie });
         assert.equal(refreshed.status, 200);
         checkToken(refreshed.body.accessToken, users.OWNER.id);
@@ -224,7 +227,9 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal((await request("/api/auth/refresh", { method: "POST", cookie: refreshCookie })).status, 401);
         const nextCookie = refreshed.cookie.split(";")[0];
         assert.notEqual(nextCookie, refreshCookie);
-        assert.equal((await request("/api/auth/logout", { method: "POST", cookie: nextCookie })).status, 204);
+        const logout = await request("/api/auth/logout", { method: "POST", cookie: nextCookie });
+        assert.equal(logout.status, 200);
+        assert.equal(logout.body.message, "Sikeres kijelentkezés.");
         assert.equal((await request("/api/auth/refresh", { method: "POST", cookie: nextCookie })).status, 401);
         for (const dates of [{ expiresAt: new Date(0) }, { createdAt: new Date(0) }]) {
           const token = randomUUID();

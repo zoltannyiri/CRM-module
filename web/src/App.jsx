@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import Sidebar from "./components/Sidebar.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import PartnerPage from "./pages/PartnerPage.jsx";
 
 function App() {
@@ -12,8 +13,8 @@ function App() {
       <Routes>
         <Route path="/register/:token" element={<RegisterPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/partner" element={<div className="flex min-h-dvh bg-[#f6f8f9]"><Sidebar /><main className="min-w-0 flex-1" aria-label="Munkaterület"><PartnerPage /></main></div>} />
-        <Route path="/" element={<div className="flex min-h-dvh bg-[#f6f8f9]"><Sidebar /><main className="min-w-0 flex-1" aria-label="Munkaterület" /></div>} />
+        <Route path="/partner" element={<ProtectedRoute><div className="flex min-h-dvh bg-[#f6f8f9]"><Sidebar /><main className="min-w-0 flex-1" aria-label="Munkaterület"><PartnerPage /></main></div></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><div className="flex min-h-dvh bg-[#f6f8f9]"><Sidebar /><main className="min-w-0 flex-1" aria-label="Munkaterület" /></div></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   )

@@ -1,66 +1,79 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { apiRequest, authApi } from "../api/client.js";
-
-const REFRESH_INTERVAL = 14 * 60 * 1000;
+import apiClient, {
+  AUTH_SESSION_ENDED_EVENT,
+  AUTH_TOKEN_CHANGED_EVENT,
+  authApi,
+  clearAccessToken,
+  getAccessToken,
+  refreshSession,
+  storeAccessToken,
+} from "../api/apiClient.js";
 import { AuthContext } from "./AuthContextDefinition.js";
 
 export const AuthProvider = ({ children }) => {
-  const [accessToken, setAccessToken] = useState(null);
+  const [accessToken, setAccessToken] = useState(getAccessToken);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const refreshInFlight = useRef(null);
-
-  const refreshAccessToken = async () => {
-    if (!refreshInFlight.current) {
-      refreshInFlight.current = authApi.refresh()
-        .then(({ accessToken: nextAccessToken }) => {
-          setAccessToken(nextAccessToken);
-          return nextAccessToken;
-        })
-        .catch((error) => {
-          setAccessToken(null);
-          setUser(null);
-          throw error;
-        })
-        .finally(() => {
-          refreshInFlight.current = null;
-        });
-    }
-
-    return refreshInFlight.current;
-  };
 
   useEffect(() => {
-    refreshAccessToken()
-      .then((nextAccessToken) => authApi.me(nextAccessToken))
-      .then(setUser)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const handleTokenChanged = (event) => setAccessToken(event.detail);
+    const handleSessionEnded = () => {
+      setAccessToken(null);
+      setUser(null);
+    };
+    const handleStorage = (event) => {
+      if (event.key === "accessToken") {
+        setAccessToken(event.newValue);
+        if (!event.newValue) setUser(null);
+      }
+    };
+
+    window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChanged);
+    window.addEventListener(AUTH_SESSION_ENDED_EVENT, handleSessionEnded);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChanged);
+      window.removeEventListener(AUTH_SESSION_ENDED_EVENT, handleSessionEnded);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   useEffect(() => {
-    if (!accessToken) {
-      return undefined;
-    }
+    let active = true;
 
-    const intervalId = window.setInterval(() => {
-      refreshAccessToken().catch(() => {});
-    }, REFRESH_INTERVAL);
+    const restoreSession = async () => {
+      try {
+        if (!getAccessToken()) {
+          await refreshSession();
+        }
 
-    return () => window.clearInterval(intervalId);
-  }, [accessToken]);
+        const restoredUser = await authApi.me();
+        if (active) setUser(restoredUser);
+      } catch {
+        clearAccessToken();
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    restoreSession();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const login = async (credentials) => {
     const result = await authApi.login(credentials);
-    setAccessToken(result.accessToken);
+    storeAccessToken(result.accessToken);
     setUser(result.user);
     return result.user;
   };
 
   const register = async (token, details) => {
     const result = await authApi.register(token, details);
-    setAccessToken(result.accessToken);
+    storeAccessToken(result.accessToken);
     setUser(result.user);
     return result.user;
   };
@@ -69,22 +82,27 @@ export const AuthProvider = ({ children }) => {
     try {
       await authApi.logout();
     } finally {
-      setAccessToken(null);
-      setUser(null);
+      clearAccessToken();
     }
   };
 
+  // Kompatibilitási adapter a már meglévő useAuth().request hívásokhoz.
   const request = async (path, options = {}) => {
-    try {
-      return await apiRequest(path, options, accessToken);
-    } catch (error) {
-      if (error.status !== 401 || !accessToken) {
-        throw error;
-      }
+    const headers = { ...options.headers };
+    let data = options.body;
 
-      const nextAccessToken = await refreshAccessToken();
-      return apiRequest(path, options, nextAccessToken);
+    if (typeof data === "string" && headers["Content-Type"]?.includes("application/json")) {
+      data = JSON.parse(data);
     }
+
+    const response = await apiClient({
+      url: path,
+      method: options.method || "GET",
+      headers,
+      data,
+    });
+
+    return response.data;
   };
 
   return (
@@ -97,7 +115,7 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
-        refreshAccessToken,
+        refreshAccessToken: refreshSession,
         request,
       }}
     >
@@ -105,4 +123,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-

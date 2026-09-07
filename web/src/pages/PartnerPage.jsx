@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import PartnerListComponent from "../components/partner/PartnerListComponent.jsx";
-import TMP_PARTNERS from "../components/data/tmpPartners.js";
 import Topbar from "../components/Topbar.jsx";
 
 const iconPaths = {
@@ -19,16 +18,6 @@ export default function PartnerPage() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [sortDirection, setSortDirection] = useState("desc");
-
-  const partners = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("hu");
-    const filtered = TMP_PARTNERS.filter((partner) => {
-      const typeMatches = typeFilter === "ALL" || partner.type === typeFilter;
-      const queryMatches = !needle || [partner.name, partner.email, partner.phone, partner.website, partner.mainContact].some((value) => value?.toLocaleLowerCase("hu").includes(needle));
-      return typeMatches && queryMatches;
-    });
-    return [...filtered].sort((a, b) => sortDirection === "asc" ? a.id - b.id : b.id - a.id);
-  }, [query, typeFilter, sortDirection]);
 
   const handleCreatePartner = () => console.log("TMP create partner");
   const handleOpenPartner = (partner) => console.log("TMP open partner", partner);
@@ -51,7 +40,7 @@ export default function PartnerPage() {
       </div>
 
       <div className="px-5 py-5">
-        <PartnerListComponent partners={partners} onOpen={handleOpenPartner} />
+        <PartnerListComponent query={query} typeFilter={typeFilter} sortDirection={sortDirection} onOpen={handleOpenPartner} />
       </div>
     </div>
   );

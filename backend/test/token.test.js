@@ -11,7 +11,7 @@ test("access tokens omit legacy tenant/role fields even when supplied", () => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     assert.deepEqual(Object.keys(decoded).sort(), ["exp", "iat", "userId"]);
     assert.equal(decoded.userId, 42);
-    assert.equal(decoded.exp - decoded.iat, 900);
+    assert.equal(decoded.exp - decoded.iat, 1800);
   } finally {
     if (previous === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = previous;
