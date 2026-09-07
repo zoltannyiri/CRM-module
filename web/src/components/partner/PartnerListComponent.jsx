@@ -107,11 +107,11 @@ export default function PartnerListComponent({ query = "", typeFilter = "ALL", s
     <section className="bg-[#f3f5f6] px-5 pb-5" aria-label="Partnerlista">
       {selected.length > 0 && <div className="border-x border-t border-[#dbe1df] bg-white px-4 py-2.5 text-xs font-medium text-[#4f7954]">{selected.length} partner kiválasztva</div>}
 
-      <div className="overflow-x-auto border border-[#dbe1df] bg-white rounded-2xl">
+      <div className="relative overflow-x-auto rounded-2xl border border-[#dbe1df] bg-white" aria-busy={loading}>
+        {loading && <div className="absolute inset-x-0 top-12 bottom-0 z-10 grid place-items-center bg-white" role="status" aria-label="Partnerlista betöltése"><i className="pi pi-spinner pi-spin text-2xl text-[#6fa675]" aria-hidden="true" /></div>}
         <DataTable
           value={visible}
           dataKey="id"
-          loading={loading}
           unstyled
           tableClassName="w-full min-w-[1100px] border-collapse text-left"
           rowClassName={(partner) => `${selected.includes(partner.id) ? "bg-[#f5faf5]" : "bg-white"} hover:bg-[#fafcfc]`}

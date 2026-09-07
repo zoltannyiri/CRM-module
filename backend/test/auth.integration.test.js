@@ -45,11 +45,13 @@ test("auth and tenant authorization HTTP integration", {
   });
 
   const { default: authRoutes } = await import("../src/routes/authRoutes.js");
+  const { default: contactRoutes } = await import("../src/routes/contactRoutes.js");
   const { default: partnerRoutes } = await import("../src/routes/partnerRoutes.js");
   const { generateAccessToken, hashRefreshToken, hashInviteToken } = await import("../src/utils/token.js");
   const app = express();
   app.use(express.json(), cookieParser());
   app.use("/api/auth", authRoutes);
+  app.use("/api/contacts", contactRoutes);
   app.use("/api/partners", partnerRoutes);
   app.use((error, _req, res, _next) => res.status(500).json({ message: error.message }));
   const server = app.listen(0, "127.0.0.1");
@@ -174,9 +176,16 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(created.status, 201);
         assert.equal(created.body.organizationId, org.id);
         const id = created.body.id;
+        const localContact = await tx.contact.create({ data: { partnerId: id, firstName: "Local", lastName: "Contact" } });
+        await tx.contact.create({ data: { partnerId: foreign.id, firstName: "Foreign", lastName: "Contact" } });
         const list = await request("/api/partners", { token: ownerToken });
         assert.equal(list.status, 200);
         assert.deepEqual(list.body.map((partner) => partner.id), [id]);
+        const contacts = await request("/api/contacts", { token: ownerToken });
+        assert.equal(contacts.status, 200);
+        assert.deepEqual(contacts.body.map((contact) => contact.id), [localContact.id]);
+        assert.equal(contacts.body[0].partner.name, "Local");
+        assert.equal((await request("/api/contacts")).status, 401);
         const csvExport = await request("/api/partners/export?format=csv", { token: ownerToken });
         assert.equal(csvExport.status, 200);
         assert.match(csvExport.contentType, /text\/csv/);
@@ -203,10 +212,57 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(changed.body.id, id);
         assert.equal(changed.body.organizationId, org.id);
         assert.equal(changed.body.name, "Updated");
-        assert.deepEqual(changed.body.contacts, []);
+        assert.deepEqual(changed.body.contacts.map((contact) => contact.id), [localContact.id]);
+        assert.equal(await tx.contact.count({ where: { partnerId: id } }), 1);
         assert.equal((await request(`/api/partners/${id}`, { method: "DELETE", token: ownerToken })).status, 200);
         assert.equal((await request(`/api/partners/${id}`, { token: ownerToken })).status, 404);
         assert.equal((await tx.partner.findUnique({ where: { id: foreign.id } })).name, "Foreign");
+      });
+
+      await t.test("contacts CRUD remains isolated through the owning partner", async () => {
+        const localPartner = await tx.partner.create({ data: { organizationId: org.id, name: "Local contact company" } });
+        const foreignPartner = await tx.partner.create({ data: { organizationId: otherOrg.id, name: "Foreign contact company" } });
+        const foreignContact = await tx.contact.create({ data: { partnerId: foreignPartner.id, firstName: "Foreign", lastName: "Person" } });
+        const created = await request("/api/contacts", { method: "POST", token: ownerToken, body: {
+          partnerId: localPartner.id, firstName: "Anna", lastName: "Kovács", position: "Ügyvezető",
+          organizationId: otherOrg.id, id: foreignContact.id,
+        } });
+        assert.equal(created.status, 201);
+        assert.equal(created.body.partnerId, localPartner.id);
+        assert.equal(created.body.partner.name, localPartner.name);
+        const contactId = created.body.id;
+
+        assert.equal((await request("/api/contacts", { method: "POST", token: ownerToken, body: {
+          partnerId: foreignPartner.id, firstName: "Intrusion", lastName: "Attempt",
+        } })).status, 404);
+        const list = await request("/api/contacts", { token: ownerToken });
+        assert.deepEqual(list.body.map((contact) => contact.id), [contactId]);
+        const csvExport = await request("/api/contacts/export?format=csv", { token: ownerToken });
+        assert.equal(csvExport.status, 200);
+        assert.match(csvExport.contentType, /text\/csv/);
+        assert.match(csvExport.body.toString("utf8"), /Kovács/);
+        assert.doesNotMatch(csvExport.body.toString("utf8"), /Foreign/);
+        for (const [format, signature] of [["xlsx", "PK"], ["pdf", "%PDF"]]) {
+          const exported = await request(`/api/contacts/export?format=${format}`, { token: ownerToken });
+          assert.equal(exported.status, 200, format);
+          assert.equal(exported.body.subarray(0, signature.length).toString(), signature);
+        }
+        assert.equal((await request("/api/contacts/export?format=xml", { token: ownerToken })).status, 400);
+        assert.equal((await request(`/api/contacts/${foreignContact.id}`, { token: ownerToken })).status, 404);
+        assert.equal((await request(`/api/contacts/${foreignContact.id}`, { method: "DELETE", token: ownerToken })).status, 404);
+        assert.equal((await request(`/api/contacts/${contactId}`, { method: "PATCH", token: ownerToken, body: {
+          partnerId: foreignPartner.id, firstName: "Moved", lastName: "Outside",
+        } })).status, 404);
+
+        const updated = await request(`/api/contacts/${contactId}`, { method: "PATCH", token: ownerToken, body: {
+          partnerId: localPartner.id, firstName: "Anna", lastName: "Nagy", email: "anna@example.invalid",
+        } });
+        assert.equal(updated.status, 200);
+        assert.equal(updated.body.lastName, "Nagy");
+        assert.equal(updated.body.email, "anna@example.invalid");
+        assert.equal((await request(`/api/contacts/${contactId}`, { method: "DELETE", token: ownerToken })).status, 200);
+        assert.equal((await request(`/api/contacts/${contactId}`, { token: ownerToken })).status, 404);
+        assert.ok(await tx.contact.findUnique({ where: { id: foreignContact.id } }));
       });
 
       await t.test("invitation registration retains membership and is single use", async () => {

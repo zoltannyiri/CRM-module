@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.js";
 
 const icons = {
@@ -30,11 +31,23 @@ const navigation = [
   { id: "help", label: "Súgó és támogatás" },
 ];
 
+const childRoutes = {
+  contacts: ["/partner", "/contact"],
+};
+
+const activeItemForPath = (pathname) => {
+  if (pathname.startsWith("/contact")) return "contacts-1";
+  if (pathname.startsWith("/partner")) return "contacts-0";
+  return "dashboard";
+};
+
 export default function Sidebar() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 640px)").matches);
-  const [activeItem, setActiveItem] = useState("dashboard");
-  const [expandedGroup, setExpandedGroup] = useState(null);
+  const [activeItem, setActiveItem] = useState(() => activeItemForPath(location.pathname));
+  const [expandedGroup, setExpandedGroup] = useState(() => location.pathname.startsWith("/partner") || location.pathname.startsWith("/contact") ? "contacts" : null);
 
   function selectItem(item) {
     if (item.children) {
@@ -43,6 +56,12 @@ export default function Sidebar() {
     } else {
       setActiveItem(item.id);
     }
+  }
+
+  function selectChild(item, index) {
+    setActiveItem(`${item.id}-${index}`);
+    const route = childRoutes[item.id]?.[index];
+    if (route) navigate(route);
   }
 
   return (
@@ -75,7 +94,7 @@ export default function Sidebar() {
                   <ul id={`sidebar-${item.id}`} className="mt-[5px] mb-[7px] ml-[22px] list-none border-l border-[#e4e9e6] pl-[17px]" hidden={!expanded}>
                     {item.children.map((label, index) => {
                       const id = `${item.id}-${index}`;
-                      return <li key={id}><button type="button" className={`w-full cursor-pointer rounded-[5px] border-0 px-2.5 py-[9px] text-left text-xs ${activeItem === id ? "bg-[#eff6ee] font-semibold text-[#3c7547]" : "bg-transparent text-[#77817e] hover:bg-[#f7f8f8] hover:text-[#202e33]"}`} aria-pressed={activeItem === id} onClick={() => setActiveItem(id)}>{label}</button></li>;
+                      return <li key={id}><button type="button" className={`w-full cursor-pointer rounded-[5px] border-0 px-2.5 py-[9px] text-left text-xs ${activeItem === id ? "bg-[#eff6ee] font-semibold text-[#3c7547]" : "bg-transparent text-[#77817e] hover:bg-[#f7f8f8] hover:text-[#202e33]"}`} aria-pressed={activeItem === id} onClick={() => selectChild(item, index)}>{label}</button></li>;
                     })}
                   </ul>
                 )}

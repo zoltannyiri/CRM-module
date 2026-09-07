@@ -29,7 +29,7 @@ export default function Topbar({ searchValue = "", onSearchChange, onCreate }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2.5">
-        <button type="button" onClick={onCreate} className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#68aa6e] max-[700px]:hidden"><Icon name="plus" />Új rekord</button>
+        {onCreate && <button type="button" onClick={onCreate} className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#68aa6e] max-[700px]:hidden"><Icon name="plus" />Új rekord</button>}
         <button type="button" aria-label="Értesítések" className="grid size-9 cursor-pointer place-items-center rounded-full border-0 bg-[#f5f7f7] text-[#607074] hover:bg-[#edf1f0]"><Icon name="bell" /></button>
         <button type="button" aria-label="Üzenetek" className="grid size-9 cursor-pointer place-items-center rounded-full border-0 bg-[#f5f7f7] text-[#607074] hover:bg-[#edf1f0]"><Icon name="message" /></button>
         <button type="button" aria-label="Felhasználói profil" className="grid size-9 cursor-pointer place-items-center rounded-full border-2 border-[#70b8b2] bg-[#e9f2ed] text-[11px] font-bold text-[#3e6964]">{initials}</button>
