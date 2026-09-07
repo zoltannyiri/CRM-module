@@ -10,10 +10,33 @@ const iconPaths = {
 };
 
 function Icon({ name, className = "size-4" }) {
-  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {iconPaths[name]}
+    </svg>
+  );
 }
 
-const lightButton = "inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
+const lightButton =
+  "inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
+
+function getStoredViewMode() {
+  try {
+    const stored = localStorage.getItem("partnerViewMode");
+    return stored === "cards" ? "cards" : "table";
+  } catch {
+    return "table";
+  }
+}
 
 export default function PartnerPage() {
   const [query, setQuery] = useState("");
@@ -23,22 +46,37 @@ export default function PartnerPage() {
   const [activePartner, setActivePartner] = useState(null);
   const [formMode, setFormMode] = useState("create");
   const [listReloadKey, setListReloadKey] = useState(0);
+  const [viewMode, setViewMode] = useState(getStoredViewMode);
+
+  const handleViewModeChange = (mode) => {
+    if (mode === "table" || mode === "cards") {
+      setViewMode(mode);
+      try {
+        localStorage.setItem("partnerViewMode", mode);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  };
 
   const handleCreatePartner = () => {
     setActivePartner(null);
     setFormMode("create");
     setFormOpen(true);
   };
+
   const handleViewPartner = (partner) => {
     setActivePartner(partner);
     setFormMode("view");
     setFormOpen(true);
   };
+
   const handleEditPartner = (partner) => {
     setActivePartner(partner);
     setFormMode("edit");
     setFormOpen(true);
   };
+
   const handleCloseForm = () => setFormOpen(false);
   const handlePartnerSaved = () => setListReloadKey((value) => value + 1);
 
@@ -48,22 +86,116 @@ export default function PartnerPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-y border-[#e3e8e6] bg-white px-5 py-3 lg:px-7">
         <div className="flex items-center gap-2">
-          <div className="relative"><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Partner típus" className={`${lightButton} min-w-[128px] appearance-none pr-9 outline-none`}><option value="ALL">Összes partner</option><option value="COMPANY">Cégek</option><option value="PERSON">Magánszemélyek</option></select><Icon name="chevron" className="pointer-events-none absolute top-1/2 right-3 size-3.5 -translate-y-1/2" /></div>
-          <button type="button" className={lightButton}><Icon name="filter" className="size-3.5 text-[#748084]" />Szűrés</button>
+          <div className="relative">
+            <select
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
+              aria-label="Partner típus"
+              className={`${lightButton} min-w-[128px] appearance-none pr-9 outline-none`}
+            >
+              <option value="ALL">Összes partner</option>
+              <option value="COMPANY">Cégek</option>
+              <option value="PERSON">Magánszemélyek</option>
+            </select>
+            <Icon
+              name="chevron"
+              className="pointer-events-none absolute top-1/2 right-3 size-3.5 -translate-y-1/2"
+            />
+          </div>
+          <button type="button" className={lightButton}>
+            <Icon name="filter" className="size-3.5 text-[#748084]" />
+            Szűrés
+          </button>
         </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs">Rendezés</span>
-          <button type="button" onClick={() => setSortDirection((value) => value === "desc" ? "asc" : "desc")} className={`${lightButton} min-w-[125px] justify-between`}>Létrehozás<Icon name="chevron" className={`size-3.5 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`} /></button>
-          <PartnerExportMenu query={query} typeFilter={typeFilter} sortDirection={sortDirection} buttonClassName={lightButton} />
-          <button type="button" onClick={handleCreatePartner} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]">Új partner<Icon name="chevron" className="size-3.5" /></button>
+          <button
+            type="button"
+            onClick={() => setSortDirection((value) => (value === "desc" ? "asc" : "desc"))}
+            className={`${lightButton} min-w-[125px] justify-between`}
+          >
+            Létrehozás
+            <Icon
+              name="chevron"
+              className={`size-3.5 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          <PartnerExportMenu
+            query={query}
+            typeFilter={typeFilter}
+            sortDirection={sortDirection}
+            buttonClassName={lightButton}
+          />
+
+          {/* Table / Cards nézetváltó kapcsoló */}
+          <div
+            className="inline-flex h-9 items-center rounded-md border border-[#d6dddc] bg-white p-0.5 shadow-[0_1px_1px_rgba(26,39,35,.025)]"
+            role="group"
+            aria-label="Nézetváltás"
+          >
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("table")}
+              aria-label="Táblázat nézet"
+              title="Táblázat nézet"
+              aria-pressed={viewMode === "table"}
+              className={`grid size-8 cursor-pointer place-items-center rounded-[5px] text-xs transition-colors ${
+                viewMode === "table"
+                  ? "bg-[#eff6ee] font-semibold text-[#3c7547]"
+                  : "bg-transparent text-[#657276] hover:bg-[#f7f8f8] hover:text-[#202e33]"
+              }`}
+            >
+              <i className="pi pi-list" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("cards")}
+              aria-label="Kártya nézet"
+              title="Kártya nézet"
+              aria-pressed={viewMode === "cards"}
+              className={`grid size-8 cursor-pointer place-items-center rounded-[5px] text-xs transition-colors ${
+                viewMode === "cards"
+                  ? "bg-[#eff6ee] font-semibold text-[#3c7547]"
+                  : "bg-transparent text-[#657276] hover:bg-[#f7f8f8] hover:text-[#202e33]"
+              }`}
+            >
+              <i className="pi pi-th-large" aria-hidden="true" />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCreatePartner}
+            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]"
+          >
+            Új partner
+            <Icon name="chevron" className="size-3.5" />
+          </button>
         </div>
       </div>
 
       <div className="px-5 py-5">
-        <PartnerListComponent query={query} typeFilter={typeFilter} sortDirection={sortDirection} reloadKey={listReloadKey} onView={handleViewPartner} onEdit={handleEditPartner} />
+        <PartnerListComponent
+          query={query}
+          typeFilter={typeFilter}
+          sortDirection={sortDirection}
+          viewMode={viewMode}
+          reloadKey={listReloadKey}
+          onView={handleViewPartner}
+          onEdit={handleEditPartner}
+        />
       </div>
 
-      {formOpen && <PartnerFormComponent mode={formMode} partner={activePartner} onClose={handleCloseForm} onSaved={handlePartnerSaved} />}
+      {formOpen && (
+        <PartnerFormComponent
+          mode={formMode}
+          partner={activePartner}
+          onClose={handleCloseForm}
+          onSaved={handlePartnerSaved}
+        />
+      )}
     </div>
   );
 }
