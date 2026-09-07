@@ -10,6 +10,9 @@ import {
   hashRefreshToken,
 } from "../utils/token.js";
 
+const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+const sessionExpiry = () => new Date(Date.now() + SESSION_LIFETIME_MS);
+
 const getValidInvitation = async (token) => {
   const invitation = await prisma.invitation.findUnique({
     where: {
@@ -50,6 +53,7 @@ const createSession = async (user) => {
     data: {
       userId: user.id,
       refreshTokenHash: hashRefreshToken(refreshToken),
+      expiresAt: sessionExpiry(),
     },
   });
 
@@ -200,9 +204,8 @@ const refreshAccessToken = async (refreshToken) => {
     },
   });
 
-  const sessionLifetime = 30 * 24 * 60 * 60 * 1000;
   const expired = session && (
-    Date.now() - session.createdAt.getTime() >= sessionLifetime ||
+    Date.now() - session.createdAt.getTime() >= SESSION_LIFETIME_MS ||
     (session.expiresAt && session.expiresAt <= new Date())
   );
 
@@ -217,6 +220,10 @@ const refreshAccessToken = async (refreshToken) => {
       where: {
         id: session.id,
         revokedAt: null,
+        OR: [
+          { expiresAt: { gt: new Date() } },
+          { expiresAt: null, createdAt: { gt: new Date(Date.now() - SESSION_LIFETIME_MS) } },
+        ],
       },
       data: {
         revokedAt: new Date(),
@@ -232,6 +239,7 @@ const refreshAccessToken = async (refreshToken) => {
       data: {
         userId: session.userId,
         refreshTokenHash: hashRefreshToken(nextRefreshToken),
+        expiresAt: sessionExpiry(),
       },
     });
   });

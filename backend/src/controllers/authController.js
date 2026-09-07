@@ -2,12 +2,19 @@ import prisma from "../lib/prisma.js";
 import authService, { toPublicUser } from "../services/authService.js";
 import invitationService from "../services/invitationService.js";
 
+const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+const configuredSameSite = process.env.REFRESH_COOKIE_SAME_SITE?.toLowerCase();
 const refreshCookieOptions = {
   httpOnly: true,
-  sameSite: "lax",
+  sameSite: configuredSameSite || (process.env.NODE_ENV === "production" ? "none" : "lax"),
   secure: process.env.NODE_ENV === "production",
-  maxAge: 30 * 24 * 60 * 60 * 1000,
+  maxAge: REFRESH_COOKIE_MAX_AGE,
+  path: "/api/auth",
+  ...(process.env.REFRESH_COOKIE_DOMAIN && { domain: process.env.REFRESH_COOKIE_DOMAIN }),
 };
+
+const clearRefreshCookieOptions = { ...refreshCookieOptions };
+delete clearRefreshCookieOptions.maxAge;
 
 const setRefreshCookie = (res, refreshToken) => {
   res.cookie("refreshToken", refreshToken, refreshCookieOptions);
@@ -118,7 +125,7 @@ export const refresh = async (req, res) => {
       accessToken: result.accessToken,
     });
   } catch (error) {
-    res.clearCookie("refreshToken", refreshCookieOptions);
+    res.clearCookie("refreshToken", clearRefreshCookieOptions);
 
     return res.status(401).json({
       message: error.message,
@@ -128,7 +135,7 @@ export const refresh = async (req, res) => {
 
 export const logout = async (req, res) => {
   await authService.revokeSession(req.cookies.refreshToken);
-  res.clearCookie("refreshToken", refreshCookieOptions);
+  res.clearCookie("refreshToken", clearRefreshCookieOptions);
 
-  return res.status(204).send();
+  return res.status(200).json({ message: "Sikeres kijelentkezés." });
 };
