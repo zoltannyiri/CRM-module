@@ -25,6 +25,7 @@ export default function PartnerTableView({
         type="checkbox"
         checked={checked}
         onChange={() => onToggleSelect?.(partner.id)}
+        onClick={(event) => event.stopPropagation()}
         aria-label={`${partner.name} kijelölése`}
         className="size-4 cursor-pointer rounded-sm accent-[#78ad7d]"
       />
@@ -46,7 +47,10 @@ export default function PartnerTableView({
         </span>
         <button
           type="button"
-          onClick={() => onView?.(partner)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onView?.(partner);
+          }}
           className="cursor-pointer border-0 bg-transparent p-0 text-left text-xs font-medium text-[#263338] hover:underline"
         >
           {partner.name}
@@ -56,34 +60,52 @@ export default function PartnerTableView({
   };
 
   const actionTemplate = (partner) => (
-    <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+    <div
+      className="flex items-center justify-center gap-1 whitespace-nowrap"
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
       <button
         type="button"
-        onClick={() => onView?.(partner)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onView?.(partner);
+        }}
         aria-label={`${partner.name} megtekintése`}
         title="Megtekintés"
         className={actionButtonClass}
       >
-        <i className="pi pi-eye" aria-hidden="true" />
+        <i className="pi pi-eye pointer-events-none" aria-hidden="true" />
       </button>
       <button
         type="button"
-        onClick={() => onEdit?.(partner)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onEdit?.(partner);
+        }}
         aria-label={`${partner.name} módosítása`}
         title="Módosítás"
         className={actionButtonClass}
       >
-        <i className="pi pi-pencil" aria-hidden="true" />
+        <i className="pi pi-pencil pointer-events-none" aria-hidden="true" />
       </button>
       <button
         type="button"
-        onClick={() => onDelete?.(partner)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete?.(partner);
+        }}
         disabled={deletingId === partner.id}
         aria-label={`${partner.name} törlése`}
         title="Törlés"
         className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}
       >
-        <i className={`pi ${deletingId === partner.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" />
+        <i
+          className={`pi ${deletingId === partner.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`}
+          aria-hidden="true"
+        />
       </button>
     </div>
   );
@@ -179,8 +201,8 @@ export default function PartnerTableView({
         <Column
           header="Műveletek"
           body={actionTemplate}
-          headerClassName={`${headerClass} w-[130px] text-center`}
-          bodyClassName={`${cellClass} w-[130px]`}
+          headerClassName={`${headerClass} w-[130px] !px-2 text-center`}
+          bodyClassName={`${cellClass} w-[130px] !px-2`}
         />
       </DataTable>
     </div>

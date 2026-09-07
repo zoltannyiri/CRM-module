@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { TabView, TabPanel } from "primereact/tabview";
+
 import PartnerFormComponent from "../components/partner/PartnerFormComponent.jsx";
 import PartnerExportMenu from "../components/partner/PartnerExportMenu.jsx";
 import PartnerListComponent from "../components/partner/PartnerListComponent.jsx";
+import PartnerShowComponent from "../components/partner/PartnerShowComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 
 const iconPaths = {
@@ -39,6 +43,9 @@ function getStoredViewMode() {
 }
 
 export default function PartnerPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [sortDirection, setSortDirection] = useState("desc");
@@ -66,9 +73,7 @@ export default function PartnerPage() {
   };
 
   const handleViewPartner = (partner) => {
-    setActivePartner(partner);
-    setFormMode("view");
-    setFormOpen(true);
+    navigate(`/partner/${partner.id}`);
   };
 
   const handleEditPartner = (partner) => {
@@ -80,6 +85,41 @@ export default function PartnerPage() {
   const handleCloseForm = () => setFormOpen(false);
   const handlePartnerSaved = () => setListReloadKey((value) => value + 1);
 
+  // SHOW NÉZET: ha az URL tartalmaz partner id-t (/partner/:id)
+  if (id) {
+    return (
+      <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
+        <Topbar />
+
+        <div className="flex items-center justify-between border-b border-[#e3e8e6] bg-white px-5 py-3 lg:px-7">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/partner")}
+              className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]"
+            >
+              <i className="pi pi-arrow-left text-xs text-[#748084]" aria-hidden="true" />
+              Vissza a partnerekhez
+            </button>
+            <span className="h-4 w-px bg-[#dbe1df]" />
+            <h1 className="text-sm font-semibold text-[#253238]">Partner adatlap</h1>
+          </div>
+        </div>
+
+        <div className="px-5 py-6 lg:px-7">
+          <TabView
+            className="[&_.p-tabview-nav-container]:border-b [&_.p-tabview-nav-container]:border-[#dfe5e3] [&_.p-tabview-nav]:flex [&_.p-tabview-nav]:list-none [&_.p-tabview-nav]:gap-6 [&_.p-tabview-nav]:p-0 [&_.p-tabview-nav]:m-0 [&_.p-tabview-header]:list-none [&_.p-tabview-nav-link]:inline-flex [&_.p-tabview-nav-link]:cursor-pointer [&_.p-tabview-nav-link]:items-center [&_.p-tabview-nav-link]:border-b-2 [&_.p-tabview-nav-link]:border-transparent [&_.p-tabview-nav-link]:pb-3 [&_.p-tabview-nav-link]:text-xs [&_.p-tabview-nav-link]:font-medium [&_.p-tabview-nav-link]:text-[#657276] [&_.p-tabview-nav-link]:transition-colors [&_.p-tabview-nav-link]:hover:text-[#202e33] [&_.p-highlight_.p-tabview-nav-link]:border-[#78ad7d] [&_.p-highlight_.p-tabview-nav-link]:font-semibold [&_.p-highlight_.p-tabview-nav-link]:text-[#202e33] [&_.p-tabview-panels]:pt-6 [&_.p-tabview-panels]:p-0"
+          >
+            <TabPanel header="Alapadatok">
+              <PartnerShowComponent partnerId={id} />
+            </TabPanel>
+          </TabView>
+        </div>
+      </div>
+    );
+  }
+
+  // LISTA / KÁRTYA NÉZET: ha nincs id a paraméterekben (/partner)
   return (
     <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
       <Topbar searchValue={query} onSearchChange={setQuery} onCreate={handleCreatePartner} />

@@ -25,6 +25,7 @@ export default function ContactTableView({
         type="checkbox"
         checked={checked}
         onChange={() => onToggleSelect?.(contact.id)}
+        onClick={(event) => event.stopPropagation()}
         aria-label={`${contact.firstName} ${contact.lastName} kijelölése`}
         className="size-4 cursor-pointer rounded-sm accent-[#78ad7d]"
       />
@@ -40,7 +41,10 @@ export default function ContactTableView({
         </span>
         <button
           type="button"
-          onClick={() => onView?.(contact)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onView?.(contact);
+          }}
           className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium text-[#263338] hover:underline"
         >
           {contact.firstName} {contact.lastName}
@@ -52,34 +56,52 @@ export default function ContactTableView({
   const actionTemplate = (contact) => {
     const fullName = `${contact.firstName} ${contact.lastName}`;
     return (
-      <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+      <div
+        className="flex items-center justify-center gap-1 whitespace-nowrap"
+        onClick={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <button
           type="button"
-          onClick={() => onView?.(contact)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onView?.(contact);
+          }}
           aria-label={`${fullName} megtekintése`}
           title="Megtekintés"
           className={actionButtonClass}
         >
-          <i className="pi pi-eye" aria-hidden="true" />
+          <i className="pi pi-eye pointer-events-none" aria-hidden="true" />
         </button>
         <button
           type="button"
-          onClick={() => onEdit?.(contact)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit?.(contact);
+          }}
           aria-label={`${fullName} módosítása`}
           title="Módosítás"
           className={actionButtonClass}
         >
-          <i className="pi pi-pencil" aria-hidden="true" />
+          <i className="pi pi-pencil pointer-events-none" aria-hidden="true" />
         </button>
         <button
           type="button"
-          onClick={() => onDelete?.(contact)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete?.(contact);
+          }}
           disabled={deletingId === contact.id}
           aria-label={`${fullName} törlése`}
           title="Törlés"
           className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}
         >
-          <i className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" />
+          <i
+            className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`}
+            aria-hidden="true"
+          />
         </button>
       </div>
     );
@@ -166,8 +188,8 @@ export default function ContactTableView({
         <Column
           header="Műveletek"
           body={actionTemplate}
-          headerClassName={`${headerClass} w-[130px] text-center`}
-          bodyClassName={`${cellClass} w-[130px]`}
+          headerClassName={`${headerClass} w-[130px] !px-2 text-center`}
+          bodyClassName={`${cellClass} w-[130px] !px-2`}
         />
       </DataTable>
     </div>

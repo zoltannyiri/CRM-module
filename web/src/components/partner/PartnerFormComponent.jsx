@@ -109,19 +109,24 @@ export default function PartnerFormComponent({ mode = "create", partner, onClose
                 <label className={labelClass}>Adószám
                   <input name="taxNumber" value={formData.taxNumber} onChange={handleChange} className={fieldClass} placeholder="12345678-2-42" />
                 </label>
+                <label className={`${labelClass} sm:col-span-2`}>Cím / Székhely
+                  <input name="address" value={formData.address} onChange={handleChange} className={fieldClass} placeholder="Irányítószám, település, cím" />
+                </label>
               </div>
             </section>
 
             <section className="rounded-lg border border-[#dfe5e3] bg-white p-6">
-              <h3 className="mb-5 text-sm font-semibold text-[#2b393e]">További információk</h3>
-              <div className="grid gap-5">
-                <label className={labelClass}>Cím
-                  <input name="address" value={formData.address} onChange={handleChange} className={fieldClass} placeholder="Irányítószám, település, cím" />
-                </label>
-                <label className={labelClass}>Megjegyzés
-                  <textarea name="note" value={formData.note} onChange={handleChange} rows="5" className={`${fieldClass} h-auto resize-y py-3`} placeholder="Belső megjegyzés a partnerről" />
-                </label>
-              </div>
+              <h3 className="mb-5 text-sm font-semibold text-[#2b393e]">Megjegyzés</h3>
+              <label className={labelClass}>
+                <textarea
+                  name="note"
+                  value={formData.note}
+                  onChange={handleChange}
+                  rows="6"
+                  className={`${fieldClass} h-auto resize-y py-3`}
+                  placeholder="Megjegyzés a partnerről..."
+                />
+              </label>
             </section>
 
             {error && <p role="alert" className="rounded-md border border-[#efd7d1] bg-[#fdf1ee] px-4 py-3 text-sm text-[#9a4335]">{error}</p>}

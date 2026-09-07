@@ -137,7 +137,7 @@ export default function ContactFormComponent({ mode = "create", contact, onClose
             <section className="rounded-lg border border-[#dfe5e3] bg-white p-6">
               <h3 className="mb-5 text-sm font-semibold text-[#2b393e]">További információk</h3>
               <label className={labelClass}>Megjegyzés
-                <textarea name="note" value={formData.note} onChange={handleChange} rows="6" className={`${fieldClass} h-auto resize-y py-3`} placeholder="Belső megjegyzés a kapcsolattartóról" />
+                <textarea name="note" value={formData.note} onChange={handleChange} rows="6" className={`${fieldClass} h-auto resize-y py-3`} placeholder="Megjegyzés a kapcsolattartóról..." />
               </label>
             </section>
 

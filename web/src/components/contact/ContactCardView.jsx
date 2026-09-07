@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function ContactCardView({
   contacts = [],
@@ -12,10 +12,16 @@ export default function ContactCardView({
   loadError = "",
 }) {
   const [openMenuId, setOpenMenuId] = useState(null);
+  const menuContainerRef = useRef(null);
 
   useEffect(() => {
     if (!openMenuId) return undefined;
-    const handlePointerDown = () => setOpenMenuId(null);
+    const handlePointerDown = (event) => {
+      if (menuContainerRef.current && menuContainerRef.current.contains(event.target)) {
+        return;
+      }
+      setOpenMenuId(null);
+    };
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [openMenuId]);
@@ -93,7 +99,12 @@ export default function ContactCardView({
               </div>
 
               {/* 3 pontos műveleti gomb */}
-              <div className="relative shrink-0" onClick={(event) => event.stopPropagation()}>
+              <div
+                ref={openMenuId === contact.id ? menuContainerRef : null}
+                className="relative shrink-0"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
                 <button
                   type="button"
                   onClick={() => setOpenMenuId((current) => (current === contact.id ? null : contact.id))}
@@ -101,7 +112,7 @@ export default function ContactCardView({
                   title="Műveletek"
                   className="grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[#748084] transition hover:bg-[#f1f4f3] hover:text-[#253238]"
                 >
-                  <i className="pi pi-ellipsis-v text-xs" aria-hidden="true" />
+                  <i className="pi pi-ellipsis-v pointer-events-none text-xs" aria-hidden="true" />
                 </button>
 
                 {openMenuId === contact.id && (
@@ -112,31 +123,34 @@ export default function ContactCardView({
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setOpenMenuId(null);
                         onView?.(contact);
                       }}
                       className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#344247] hover:bg-[#f2f5f4]"
                     >
-                      <i className="pi pi-eye text-xs text-[#627b68]" aria-hidden="true" />
+                      <i className="pi pi-eye pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
                       <span>Megtekintés</span>
                     </button>
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setOpenMenuId(null);
                         onEdit?.(contact);
                       }}
                       className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#344247] hover:bg-[#f2f5f4]"
                     >
-                      <i className="pi pi-pencil text-xs text-[#627b68]" aria-hidden="true" />
+                      <i className="pi pi-pencil pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
                       <span>Módosítás</span>
                     </button>
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setOpenMenuId(null);
                         onDelete?.(contact);
                       }}
@@ -144,7 +158,7 @@ export default function ContactCardView({
                       className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#a34b3d] hover:bg-[#fdf1ee] disabled:cursor-wait disabled:opacity-50"
                     >
                       <i
-                        className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"} text-xs`}
+                        className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none text-xs`}
                         aria-hidden="true"
                       />
                       <span>Törlés</span>
