@@ -17,6 +17,28 @@ async function getPartners({ organizationId }) {
   return partners;
 }
 
+async function getPartnersForExport({ organizationId, query = "", type = "ALL", sortDirection = "desc" }) {
+  const partners = await prisma.partner.findMany({
+    where: {
+      organizationId,
+      ...(type === "COMPANY" || type === "PERSON" ? { type } : {}),
+    },
+    include: { contacts: true },
+    orderBy: { id: sortDirection === "asc" ? "asc" : "desc" },
+  });
+
+  const normalizedQuery = query.trim().toLocaleLowerCase("hu");
+  if (!normalizedQuery) return partners;
+
+  return partners.filter((partner) => {
+    const contactName = partner.contacts[0]
+      ? `${partner.contacts[0].firstName} ${partner.contacts[0].lastName}`
+      : "";
+    return [partner.name, partner.email, partner.phone, partner.website, contactName]
+      .some((value) => value?.toLocaleLowerCase("hu").includes(normalizedQuery));
+  });
+}
+
 async function getPartnerById({ partnerId, organizationId }) {
   return prisma.partner.findFirst({
     where: {
@@ -80,6 +102,7 @@ async function deletePartner({ organizationId, partnerId }) {
 
 export default {
   getPartners,
+  getPartnersForExport,
   getPartnerById,
   createPartner,
   updatePartner,

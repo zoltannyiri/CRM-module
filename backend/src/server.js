@@ -21,6 +21,7 @@ app.use(cors({
     return callback(new Error("A kérés originje nincs engedélyezve."));
   },
   credentials: true,
+  exposedHeaders: ["Content-Disposition"],
 }));
 
 app.use(express.json());

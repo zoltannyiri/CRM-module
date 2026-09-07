@@ -65,10 +65,19 @@ test("auth and tenant authorization HTTP integration", {
       },
       body: body && JSON.stringify(body),
     });
+    const contentType = response.headers.get("content-type") || "";
+    let responseBody = null;
+    if (response.status !== 204) {
+      responseBody = contentType.includes("application/json")
+        ? await response.json()
+        : Buffer.from(await response.arrayBuffer());
+    }
     return {
       status: response.status,
       cookie: response.headers.get("set-cookie"),
-      body: response.status === 204 ? null : await response.json(),
+      contentType,
+      disposition: response.headers.get("content-disposition"),
+      body: responseBody,
     };
   };
   const checkToken = (token, userId) => {
@@ -168,6 +177,19 @@ test("auth and tenant authorization HTTP integration", {
         const list = await request("/api/partners", { token: ownerToken });
         assert.equal(list.status, 200);
         assert.deepEqual(list.body.map((partner) => partner.id), [id]);
+        const csvExport = await request("/api/partners/export?format=csv", { token: ownerToken });
+        assert.equal(csvExport.status, 200);
+        assert.match(csvExport.contentType, /text\/csv/);
+        assert.match(csvExport.disposition, /attachment; filename="partnerek-/);
+        assert.match(csvExport.body.toString("utf8"), /Local/);
+        assert.doesNotMatch(csvExport.body.toString("utf8"), /Foreign/);
+        for (const [format, signature] of [["xlsx", "PK"], ["pdf", "%PDF"]]) {
+          const exported = await request(`/api/partners/export?format=${format}`, { token: ownerToken });
+          assert.equal(exported.status, 200, format);
+          assert.equal(exported.body.subarray(0, signature.length).toString(), signature);
+        }
+        assert.equal((await request("/api/partners/export?format=xml", { token: ownerToken })).status, 400);
+        assert.equal((await request("/api/partners/export?format=csv")).status, 401);
         assert.equal((await request(`/api/partners/${id}`, { token: ownerToken })).status, 200);
         for (const method of ["GET", "PATCH", "DELETE"]) {
           const response = await request(`/api/partners/${foreign.id}`, { method, token: ownerToken, ...(method === "PATCH" && { body: { name: "Intrusion" } }) });

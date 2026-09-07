@@ -4,22 +4,21 @@ import { Column } from "primereact/column";
 import apiClient from "../../api/apiClient.js";
 
 const iconPaths = {
-  plus: <path d="M12 5v14M5 12h14" />,
   left: <path d="m15 18-6-6 6-6" />,
   right: <path d="m9 18 6-6-6-6" />,
-  more: <><circle cx="12" cy="5" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none" /></>,
 };
 
 function Icon({ name, className = "size-4" }) {
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
 }
 
-export default function PartnerListComponent({ query = "", typeFilter = "ALL", sortDirection = "desc", onOpen }) {
+export default function PartnerListComponent({ query = "", typeFilter = "ALL", sortDirection = "desc", reloadKey = 0, onView, onEdit }) {
   const [partners, setPartners] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
   const rowsPerPage = 10;
 
   const filteredPartners = useMemo(() => {
@@ -55,16 +54,41 @@ export default function PartnerListComponent({ query = "", typeFilter = "ALL", s
   };
   const partnerTemplate = (partner) => {
     const initials = partner.name.split(" ").slice(0, 2).map((word) => word[0]).join("").toUpperCase();
-    return <div className="flex items-center gap-3"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f1f4f3] text-[11px] font-medium text-[#465458]">{initials}</span><button type="button" onClick={() => onOpen?.(partner)} className="cursor-pointer border-0 bg-transparent p-0 text-left text-xs font-medium text-[#263338] hover:underline">{partner.name}</button></div>;
+    return <div className="flex items-center gap-3"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f1f4f3] text-[11px] font-medium text-[#465458]">{initials}</span><button type="button" onClick={() => onView?.(partner)} className="cursor-pointer border-0 bg-transparent p-0 text-left text-xs font-medium text-[#263338] hover:underline">{partner.name}</button></div>;
   };
-  const actionTemplate = (partner) => <button type="button" onClick={() => onOpen?.(partner)} aria-label={`${partner.name} műveletei`} className="mx-auto grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[#788487] hover:bg-[#eef1f0] hover:text-[#263338]"><Icon name="more" className="size-4" /></button>;
+  const handleDelete = async (partner) => {
+    if (!window.confirm(`Biztosan törölni szeretnéd ezt a partnert: ${partner.name}?`)) return;
+
+    setDeletingId(partner.id);
+    setLoadError("");
+    try {
+      await apiClient.delete(`/partners/${partner.id}`);
+      setPartners((current) => current.filter(({ id }) => id !== partner.id));
+      setSelected((current) => current.filter((id) => id !== partner.id));
+    } catch (error) {
+      setLoadError(error.message || "A partner törlése sikertelen.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+  const actionButtonClass = "grid size-8 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-xs text-[#657276] transition hover:border-[#d8dfdd] hover:bg-[#f1f4f3] hover:text-[#27373c] disabled:cursor-wait disabled:opacity-50";
+  const actionTemplate = (partner) => (
+    <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+      <button type="button" onClick={() => onView?.(partner)} aria-label={`${partner.name} megtekintése`} title="Megtekintés" className={actionButtonClass}><i className="pi pi-eye" aria-hidden="true" /></button>
+      <button type="button" onClick={() => onEdit?.(partner)} aria-label={`${partner.name} módosítása`} title="Módosítás" className={actionButtonClass}><i className="pi pi-pencil" aria-hidden="true" /></button>
+      <button type="button" onClick={() => handleDelete(partner)} disabled={deletingId === partner.id} aria-label={`${partner.name} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === partner.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>
+    </div>
+  );
 
   useEffect(() => {
     let active = true;
 
     apiClient.get("/partners")
       .then(({ data }) => {
-        if (active) setPartners(data);
+        if (active) {
+          setPartners(data);
+          setLoadError("");
+        }
       })
       .catch((error) => {
         if (active) setLoadError(error.message || "A partnerlista betöltése sikertelen.");
@@ -76,7 +100,7 @@ export default function PartnerListComponent({ query = "", typeFilter = "ALL", s
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
 
   return (
@@ -89,9 +113,9 @@ export default function PartnerListComponent({ query = "", typeFilter = "ALL", s
           dataKey="id"
           loading={loading}
           unstyled
-          tableClassName="w-full min-w-[820px] border-collapse text-left"
+          tableClassName="w-full min-w-[1100px] border-collapse text-left"
           rowClassName={(partner) => `${selected.includes(partner.id) ? "bg-[#f5faf5]" : "bg-white"} hover:bg-[#fafcfc]`}
-          onRowDoubleClick={(event) => onOpen?.(event.data)}
+          onRowDoubleClick={(event) => onView?.(event.data)}
           emptyMessage={<span className="block h-40 pt-16 text-center text-xs text-[#778286]">{loadError || "Nincs megjeleníthető partner."}</span>}
         >
           <Column header={<input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Minden látható partner kijelölése" className="size-4 cursor-pointer rounded-sm accent-[#78ad7d]" />} body={checkboxTemplate} headerClassName={`${headerClass} w-14 px-5`} bodyClassName={`${cellClass} w-14 px-5`} />
@@ -99,8 +123,9 @@ export default function PartnerListComponent({ query = "", typeFilter = "ALL", s
           <Column field="type" header="Típus" body={(partner) => partner.type === "COMPANY" ? "Cég" : "Magánszemély"} headerClassName={`${headerClass} w-[15%]`} bodyClassName={`${cellClass} w-[15%]`} />
           <Column field="email" header="Email" body={(partner) => partner.email || "—"} headerClassName={`${headerClass} w-[21%]`} bodyClassName={`${cellClass} w-[21%]`} />
           <Column field="phone" header="Telefon" body={(partner) => partner.phone || "—"} headerClassName={`${headerClass} w-[17%]`} bodyClassName={`${cellClass} w-[17%] whitespace-nowrap`} />
-          <Column field="contacts" header="Kapcsolattartó" body={(partner) => partner.contacts?.[0] ? `${partner.contacts[0].firstName} ${partner.contacts[0].lastName}` : "—"} headerClassName={`${headerClass} w-[18%]`} bodyClassName={`${cellClass} w-[18%]`} />
-          <Column header={<span className="mx-auto grid size-[18px] place-items-center rounded-full bg-[#26393e] text-white"><Icon name="plus" className="size-3" /></span>} body={actionTemplate} headerClassName={`${headerClass} w-14 px-3 text-center`} bodyClassName={`${cellClass} w-14 px-3 text-center`} />
+          {/* <Column field="contacts" header="Kapcsolattartó" body={(partner) => partner.contacts?.[0] ? `${partner.contacts[0].firstName} ${partner.contacts[0].lastName}` : "—"} headerClassName={`${headerClass} w-[18%]`} bodyClassName={`${cellClass} w-[18%]`} /> */}
+          <Column field="website" header="Weboldal" body={(partner) => partner.website ? <a href={partner.website} target="_blank" rel="noopener noreferrer" className="text-[#1f3035] underline hover:text-[#445156]">{partner.website}</a> : "—"} headerClassName={`${headerClass} w-[21%]`} bodyClassName={`${cellClass} w-[21%]`} />
+          <Column header="Műveletek" body={actionTemplate} headerClassName={`${headerClass} w-[130px] text-center`} bodyClassName={`${cellClass} w-[130px]`} />
         </DataTable>
       </div>
 
