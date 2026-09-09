@@ -134,12 +134,8 @@ export default function PartnerContactsComponent({ partnerId }) {
             </div>
           </div>
         ) : contacts.length === 0 ? (
-          <div className="grid min-h-52 place-items-center px-6 py-10 text-center">
-            <div>
-              <span className="mx-auto grid size-11 place-items-center rounded-full bg-[#eff6ee] text-[#69a46e]"><i className="pi pi-users text-base" aria-hidden="true" /></span>
-              <p className="mt-4 text-sm font-medium text-[#344247]">Ehhez a partnerhez még nincs kapcsolattartó.</p>
-              {canCreate && <button type="button" onClick={openCreate} className="mt-4 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white hover:bg-[#68aa6e]"><i className="pi pi-plus text-[10px]" aria-hidden="true" />Új kapcsolattartó</button>}
-            </div>
+          <div className="grid min-h-40 place-items-center px-6 text-center text-xs text-[#778286]">
+            Ehhez a partnerhez még nincs kapcsolattartó.
           </div>
         ) : (
           <div className="divide-y divide-[#e4e9e7]">
