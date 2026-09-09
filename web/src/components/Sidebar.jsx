@@ -24,8 +24,8 @@ function Icon({ name, className = "", size = "size-[19px]" }) {
 const navigation = [
   { id: "dashboard", label: "Áttekintés" },
   { id: "pipeline", label: "Értékesítés", children: ["Folyamatok", "Lehetőségek"] },
-  { id: "contacts", label: "Partnerek", children: ["Összes partner", "Kapcsolattartók"] },
-  { id: "projects", label: "Projektek", route: "/project" },
+  { id: "contacts", label: "Partnerek", module: "PARTNERS", children: ["Összes partner", "Kapcsolattartók"] },
+  { id: "projects", label: "Projektek", module: "PROJECTS", route: "/project" },
   { id: "products", label: "Termékek", children: ["Összes termék", "Kategóriák"] },
   { id: "messages", label: "Üzenetek" },
   { id: "activities", label: "Tevékenységek", children: ["Tevékenységek", "Feladatok", "Naptár"] },
@@ -48,7 +48,7 @@ const activeItemForPath = (pathname) => {
 };
 
 export default function Sidebar() {
-  const { user } = useAuth();
+  const { user, hasModule } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 640px)").matches);
@@ -91,7 +91,7 @@ export default function Sidebar() {
 
       <nav id="sidebar-navigation" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-[22px] [scrollbar-width:thin]" aria-label="Fő navigáció">
         <ul className="m-0 grid list-none gap-[5px] p-0">
-          {navigation.map((item) => {
+          {navigation.filter((item) => !item.module || hasModule(item.module)).map((item) => {
             const expanded = !collapsed && expandedGroup === item.id;
             const selected = activeItem === item.id || activeItem.startsWith(`${item.id}-`);
             return (
@@ -104,6 +104,7 @@ export default function Sidebar() {
                 {item.children && (
                   <ul id={`sidebar-${item.id}`} className="mt-[5px] mb-[7px] ml-[22px] list-none border-l border-[#e4e9e6] pl-[17px]" hidden={!expanded}>
                     {item.children.map((label, index) => {
+                      if (item.id === "activities" && index === 1 && !hasModule("TASKS")) return null;
                       const id = `${item.id}-${index}`;
                       return <li key={id}><button type="button" className={`w-full cursor-pointer rounded-[5px] border-0 px-2.5 py-[9px] text-left text-xs ${activeItem === id ? "bg-[#eff6ee] font-semibold text-[#3c7547]" : "bg-transparent text-[#77817e] hover:bg-[#f7f8f8] hover:text-[#202e33]"}`} aria-pressed={activeItem === id} onClick={() => selectChild(item, index)}>{label}</button></li>;
                     })}

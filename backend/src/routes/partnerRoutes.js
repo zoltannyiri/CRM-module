@@ -2,14 +2,17 @@ import express from 'express';
 import partnerController from '../controllers/partnerController.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import requireOrganization from '../middleware/requireOrganization.js';
+import requireModule from '../middleware/requireModule.js';
 
 const router = express.Router();
 
-router.get('/', authMiddleware, requireOrganization, partnerController.getPartners);
-router.get('/export', authMiddleware, requireOrganization, partnerController.exportPartners);
-router.get('/:id', authMiddleware, requireOrganization, partnerController.getPartnerById);
-router.post('/', authMiddleware, requireOrganization, partnerController.createPartner);
-router.patch('/:id', authMiddleware, requireOrganization, partnerController.updatePartner);
-router.delete('/:id', authMiddleware, requireOrganization, partnerController.deletePartner);
+router.use(authMiddleware, requireOrganization, requireModule("PARTNERS"));
+
+router.get('/', partnerController.getPartners);
+router.get('/export', partnerController.exportPartners);
+router.get('/:id', partnerController.getPartnerById);
+router.post('/', partnerController.createPartner);
+router.patch('/:id', partnerController.updatePartner);
+router.delete('/:id', partnerController.deletePartner);
 
 export default router;

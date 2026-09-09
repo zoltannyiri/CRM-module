@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 
 import prisma from "../lib/prisma.js";
 import { getDefaultMembership } from "./organizationService.js";
+import { getEnabledModules } from "./organizationModuleService.js";
 
 import {
   generateAccessToken,
@@ -153,6 +154,7 @@ const registerUser = async ({
     accessToken: generateAccessToken(user),
     refreshToken: await createSession(user),
     user: toPublicUser(user, membership),
+    modules: await getEnabledModules(membership.organizationId),
   };
 };
 
@@ -187,6 +189,7 @@ const loginUser = async ({ email, password }) => {
     accessToken: generateAccessToken(user),
     refreshToken: await createSession(user),
     user: toPublicUser(user, membership),
+    modules: membership ? await getEnabledModules(membership.organizationId) : [],
   };
 };
 

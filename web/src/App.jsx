@@ -9,6 +9,7 @@ import PartnerPage from "./pages/PartnerPage.jsx";
 import ProjectPage from "./pages/ProjectPage.jsx";
 import TaskPage from "./pages/TaskPage.jsx";
 import ActivityPage from "./pages/ActivityPage.jsx";
+import ModuleRoute from "./components/ModuleRoute.jsx";
 
 function App() {
   return (
@@ -23,7 +24,7 @@ function App() {
               <div className="flex min-h-dvh bg-[#f6f8f9]">
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <PartnerPage />
+                  <ModuleRoute module="PARTNERS"><PartnerPage /></ModuleRoute>
                 </main>
               </div>
             </ProtectedRoute>
@@ -36,7 +37,7 @@ function App() {
               <div className="flex min-h-dvh bg-[#f6f8f9]">
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <PartnerPage />
+                  <ModuleRoute module="PARTNERS"><PartnerPage /></ModuleRoute>
                 </main>
               </div>
             </ProtectedRoute>
@@ -49,7 +50,7 @@ function App() {
               <div className="flex min-h-dvh bg-[#f6f8f9]">
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ContactPage />
+                  <ModuleRoute module="PARTNERS"><ContactPage /></ModuleRoute>
                 </main>
               </div>
             </ProtectedRoute>
@@ -62,7 +63,7 @@ function App() {
               <div className="flex min-h-dvh bg-[#f6f8f9]">
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ContactPage />
+                  <ModuleRoute module="PARTNERS"><ContactPage /></ModuleRoute>
                 </main>
               </div>
             </ProtectedRoute>
@@ -75,7 +76,7 @@ function App() {
               <div className="flex min-h-dvh bg-[#f6f8f9]">
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ProjectPage />
+                  <ModuleRoute module="PROJECTS"><ProjectPage /></ModuleRoute>
                 </main>
               </div>
             </ProtectedRoute>
@@ -88,7 +89,7 @@ function App() {
               <div className="flex min-h-dvh bg-[#f6f8f9]">
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ProjectPage />
+                  <ModuleRoute module="PROJECTS"><ProjectPage /></ModuleRoute>
                 </main>
               </div>
             </ProtectedRoute>
@@ -101,7 +102,7 @@ function App() {
               <div className="flex min-h-dvh bg-[#f6f8f9]">
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <TaskPage />
+                  <ModuleRoute module="TASKS"><TaskPage /></ModuleRoute>
                 </main>
               </div>
             </ProtectedRoute>

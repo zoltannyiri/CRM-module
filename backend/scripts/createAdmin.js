@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 
 import prisma from "../src/lib/prisma.js";
+import { initializeOrganizationModules } from "../src/services/organizationModuleService.js";
 
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const password = process.env.ADMIN_PASSWORD;
@@ -42,6 +43,7 @@ try {
       organization = await transaction.organization.create({
         data: { name: organizationName, slug: configuredSlug || `${baseSlug}-${randomUUID()}` },
       });
+      await initializeOrganizationModules(organization.id, undefined, transaction);
     }
 
     await transaction.organizationMember.upsert({

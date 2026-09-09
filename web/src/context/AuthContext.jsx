@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import apiClient, {
   AUTH_SESSION_ENDED_EVENT,
@@ -14,6 +14,7 @@ import { AuthContext } from "./AuthContextDefinition.js";
 export const AuthProvider = ({ children }) => {
   const [accessToken, setAccessToken] = useState(getAccessToken);
   const [user, setUser] = useState(null);
+  const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,11 +22,15 @@ export const AuthProvider = ({ children }) => {
     const handleSessionEnded = () => {
       setAccessToken(null);
       setUser(null);
+      setModules([]);
     };
     const handleStorage = (event) => {
       if (event.key === "accessToken") {
         setAccessToken(event.newValue);
-        if (!event.newValue) setUser(null);
+        if (!event.newValue) {
+          setUser(null);
+          setModules([]);
+        }
       }
     };
 
@@ -49,8 +54,11 @@ export const AuthProvider = ({ children }) => {
           await refreshSession();
         }
 
-        const restoredUser = await authApi.me();
-        if (active) setUser(restoredUser);
+        const session = await authApi.me();
+        if (active) {
+          setUser(session.user);
+          setModules(session.modules || []);
+        }
       } catch {
         clearAccessToken();
       } finally {
@@ -68,6 +76,7 @@ export const AuthProvider = ({ children }) => {
     const result = await authApi.login(credentials);
     storeAccessToken(result.accessToken);
     setUser(result.user);
+    setModules(result.modules || []);
     return result.user;
   };
 
@@ -75,6 +84,7 @@ export const AuthProvider = ({ children }) => {
     const result = await authApi.register(token, details);
     storeAccessToken(result.accessToken);
     setUser(result.user);
+    setModules(result.modules || []);
     return result.user;
   };
 
@@ -105,11 +115,15 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
+  const hasModule = useCallback((moduleKey) => modules.includes(moduleKey), [modules]);
+
   return (
     <AuthContext.Provider
       value={{
         accessToken,
         user,
+        modules,
+        hasModule,
         loading,
         isAuthenticated: Boolean(user && accessToken),
         login,

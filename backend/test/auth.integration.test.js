@@ -48,6 +48,9 @@ test("auth and tenant authorization HTTP integration", {
   const { default: contactRoutes } = await import("../src/routes/contactRoutes.js");
   const { default: partnerRoutes } = await import("../src/routes/partnerRoutes.js");
   const { default: projectRoutes } = await import("../src/routes/projectRoutes.js");
+  const { default: taskRoutes } = await import("../src/routes/taskRoutes.js");
+  const { default: activityRoutes } = await import("../src/routes/activityRoutes.js");
+  const { default: requireModule } = await import("../src/middleware/requireModule.js");
   const { generateAccessToken, hashRefreshToken, hashInviteToken } = await import("../src/utils/token.js");
   const app = express();
   app.use(express.json(), cookieParser());
@@ -55,6 +58,8 @@ test("auth and tenant authorization HTTP integration", {
   app.use("/api/contacts", contactRoutes);
   app.use("/api/partners", partnerRoutes);
   app.use("/api/projects", projectRoutes);
+  app.use("/api/tasks", taskRoutes);
+  app.use("/api/activities", activityRoutes);
   app.use((error, _req, res, _next) => res.status(500).json({ message: error.message }));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -100,6 +105,9 @@ test("auth and tenant authorization HTTP integration", {
       const org = await tx.organization.create({ data: { name: "Auth test", slug: `auth-${suffix}` } });
       fixtureOrganizationId = org.id;
       const otherOrg = await tx.organization.create({ data: { name: "Other tenant", slug: `other-${suffix}` } });
+      await tx.organizationModule.createMany({ data: [org.id, otherOrg.id].flatMap((organizationId) =>
+        ["PARTNERS", "PROJECTS", "TASKS"].map((module) => ({ organizationId, module, enabled: true })),
+      ) });
       const users = {};
       for (const role of ["OWNER", "ADMIN", "USER", "NONE"]) {
         users[role] = await tx.user.create({ data: {
@@ -121,6 +129,7 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(login.body.user.role, "OWNER");
         assert.equal(login.body.user.organizationId, org.id);
         assert.equal(login.body.user.organization.slug, org.slug);
+        assert.deepEqual(login.body.modules, ["PARTNERS", "PROJECTS", "TASKS"]);
         assert.equal(login.body.user.passwordHash, undefined);
         assert.equal(login.body.refreshToken, undefined);
         assert.match(login.cookie, /HttpOnly/i);
@@ -131,8 +140,60 @@ test("auth and tenant authorization HTTP integration", {
         checkToken(ownerToken, users.OWNER.id);
         const me = await request("/api/auth/me", { token: ownerToken });
         assert.equal(me.status, 200);
-        assert.deepEqual(me.body, login.body.user);
+        assert.deepEqual(me.body.user, login.body.user);
+        assert.deepEqual(me.body.modules, login.body.modules);
         assert.equal((await request("/api/auth/login", { method: "POST", body: { email: users.OWNER.email, password: "wrong" } })).status, 401);
+      });
+
+      await t.test("organization module gates deny missing or disabled modules without affecting other tenants or core activity", async () => {
+        assert.throws(() => requireModule("NOT_A_MODULE"), /Érvénytelen ModuleKey konfiguráció/);
+        assert.equal((await request("/api/partners", { token: ownerToken })).status, 200);
+        assert.equal((await request("/api/projects", { token: ownerToken })).status, 200);
+        assert.equal((await request("/api/tasks", { token: ownerToken })).status, 200);
+
+        await tx.organizationModule.update({
+          where: { organizationId_module: { organizationId: org.id, module: "PROJECTS" } },
+          data: { enabled: false },
+        });
+        const disabledProject = await request("/api/projects", { token: ownerToken });
+        assert.equal(disabledProject.status, 403);
+        assert.deepEqual(disabledProject.body, {
+          message: "Ez a modul nincs engedélyezve a szervezet számára.",
+          module: "PROJECTS",
+        });
+        assert.equal((await request("/api/partners", { token: ownerToken })).status, 200);
+        assert.equal((await request("/api/activities", { token: ownerToken })).status, 200);
+        await tx.organizationModule.update({
+          where: { organizationId_module: { organizationId: org.id, module: "PROJECTS" } },
+          data: { enabled: true },
+        });
+
+        await tx.organizationModule.update({
+          where: { organizationId_module: { organizationId: otherOrg.id, module: "PROJECTS" } },
+          data: { enabled: false },
+        });
+        assert.equal((await request("/api/projects", { token: ownerToken })).status, 200);
+
+        await tx.organizationModule.update({
+          where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } },
+          data: { enabled: false },
+        });
+        assert.equal((await request("/api/partners", { token: ownerToken })).status, 403);
+        assert.equal((await request("/api/contacts", { token: ownerToken })).status, 403);
+        await tx.organizationModule.update({
+          where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } },
+          data: { enabled: true },
+        });
+
+        await tx.organizationModule.delete({
+          where: { organizationId_module: { organizationId: org.id, module: "TASKS" } },
+        });
+        assert.equal((await request("/api/tasks", { token: ownerToken })).status, 403);
+        assert.equal((await request("/api/projects", { token: ownerToken })).status, 200);
+        await tx.organizationModule.create({ data: { organizationId: org.id, module: "TASKS", enabled: true } });
+
+        const me = await request("/api/auth/me", { token: ownerToken });
+        assert.deepEqual(me.body.modules, ["PARTNERS", "PROJECTS", "TASKS"]);
       });
 
       let invitationToken;
@@ -350,6 +411,7 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(registered.body.user.role, "USER");
         assert.equal(registered.body.user.organizationId, org.id);
         assert.equal(registered.body.user.organization.slug, org.slug);
+        assert.deepEqual(registered.body.modules, ["PARTNERS", "PROJECTS", "TASKS"]);
         checkToken(registered.body.accessToken, registered.body.user.id);
         const user = await tx.user.findUnique({ where: { id: registered.body.user.id }, include: { memberships: true } });
         assert.equal(user.memberships.length, 1);
@@ -406,6 +468,12 @@ test("auth and tenant authorization HTTP integration", {
           assert.equal(initial.memberships.length, 1);
           assert.equal(initial.memberships[0].role, "OWNER");
           assert.ok(initial.memberships[0].organization.slug);
+          const defaultModules = await tx.organizationModule.findMany({
+            where: { organizationId: initial.memberships[0].organizationId, enabled: true },
+            select: { module: true },
+            orderBy: { id: "asc" },
+          });
+          assert.deepEqual(defaultModules.map(({ module }) => module), ["PARTNERS", "PROJECTS", "TASKS"]);
           assert.ok(await bcrypt.compare(password, initial.passwordHash));
           await import(`../scripts/createAdmin.js?repeat=${suffix}`);
           assert.equal(await tx.organizationMember.count({ where: { userId: initial.id } }), 1);

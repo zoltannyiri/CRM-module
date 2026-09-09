@@ -9,12 +9,14 @@ import ProjectShowComponent from "../components/project/ProjectShowComponent.jsx
 import ProjectTasksComponent from "../components/project/ProjectTasksComponent.jsx";
 import ProjectActivityComponent from "../components/project/ProjectActivityComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
+import { useAuth } from "../hooks/useAuth.js";
 
 const lightControl = "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] outline-none shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
 
 export default function ProjectPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { hasModule } = useAuth();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [partnerFilter, setPartnerFilter] = useState("");
@@ -64,9 +66,11 @@ export default function ProjectPage() {
             <TabPanel header="Alapadatok">
               <ProjectShowComponent projectId={id} />
             </TabPanel>
-            <TabPanel header="Feladatok">
-              <ProjectTasksComponent projectId={id} />
-            </TabPanel>
+            {hasModule("TASKS") && (
+              <TabPanel header="Feladatok">
+                <ProjectTasksComponent projectId={id} />
+              </TabPanel>
+            )}
             <TabPanel header="Tevékenységek">
               <ProjectActivityComponent projectId={id} />
             </TabPanel>
