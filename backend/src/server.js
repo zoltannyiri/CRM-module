@@ -7,6 +7,8 @@ import authRoutes from "./routes/authRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import partnerRoutes from "./routes/partnerRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
+import memberRoutes from "./routes/memberRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
 
 const app = express();
 
@@ -33,6 +35,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/partners", partnerRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/members", memberRoutes);
+app.use("/api/tasks", taskRoutes);
 
 const PORT = process.env.PORT || 5000;
 

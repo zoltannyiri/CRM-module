@@ -6,6 +6,7 @@ import apiClient from "../api/apiClient.js";
 import ProjectFormComponent from "../components/project/ProjectFormComponent.jsx";
 import ProjectListComponent from "../components/project/ProjectListComponent.jsx";
 import ProjectShowComponent from "../components/project/ProjectShowComponent.jsx";
+import ProjectTasksComponent from "../components/project/ProjectTasksComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 
 const lightControl = "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] outline-none shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
@@ -61,6 +62,9 @@ export default function ProjectPage() {
           <TabView className="[&_.p-tabview-nav-container]:border-b [&_.p-tabview-nav-container]:border-[#dfe5e3] [&_.p-tabview-nav]:m-0 [&_.p-tabview-nav]:flex [&_.p-tabview-nav]:list-none [&_.p-tabview-nav]:gap-6 [&_.p-tabview-nav]:p-0 [&_.p-tabview-header]:list-none [&_.p-tabview-nav-link]:inline-flex [&_.p-tabview-nav-link]:cursor-pointer [&_.p-tabview-nav-link]:items-center [&_.p-tabview-nav-link]:border-b-2 [&_.p-tabview-nav-link]:border-transparent [&_.p-tabview-nav-link]:pb-3 [&_.p-tabview-nav-link]:text-xs [&_.p-tabview-nav-link]:font-medium [&_.p-tabview-nav-link]:text-[#657276] [&_.p-tabview-nav-link]:transition-colors [&_.p-tabview-nav-link]:hover:text-[#202e33] [&_.p-highlight_.p-tabview-nav-link]:border-[#78ad7d] [&_.p-highlight_.p-tabview-nav-link]:font-semibold [&_.p-highlight_.p-tabview-nav-link]:text-[#202e33] [&_.p-tabview-panels]:p-0 [&_.p-tabview-panels]:pt-6">
             <TabPanel header="Alapadatok">
               <ProjectShowComponent projectId={id} />
+            </TabPanel>
+            <TabPanel header="Feladatok">
+              <ProjectTasksComponent projectId={id} />
             </TabPanel>
           </TabView>
         </div>

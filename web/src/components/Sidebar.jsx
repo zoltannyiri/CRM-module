@@ -35,12 +35,14 @@ const navigation = [
 
 const childRoutes = {
   contacts: ["/partner", "/contact"],
+  activities: ["/task"],
 };
 
 const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/contact")) return "contacts-1";
   if (pathname.startsWith("/partner")) return "contacts-0";
   if (pathname.startsWith("/project")) return "projects";
+  if (pathname.startsWith("/task")) return "activities-0";
   return "dashboard";
 };
 
@@ -50,7 +52,11 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 640px)").matches);
   const [activeItem, setActiveItem] = useState(() => activeItemForPath(location.pathname));
-  const [expandedGroup, setExpandedGroup] = useState(() => location.pathname.startsWith("/partner") || location.pathname.startsWith("/contact") ? "contacts" : null);
+  const [expandedGroup, setExpandedGroup] = useState(() => {
+    if (location.pathname.startsWith("/partner") || location.pathname.startsWith("/contact")) return "contacts";
+    if (location.pathname.startsWith("/task")) return "activities";
+    return null;
+  });
 
   function selectItem(item) {
     if (item.children) {
