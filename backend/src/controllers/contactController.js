@@ -3,8 +3,17 @@ import { buildContactExport, contactExportContentTypes } from "../services/conta
 
 async function getContacts(req, res, next) {
   try {
+    let partnerId;
+    if (req.query.partnerId !== undefined) {
+      partnerId = Number(req.query.partnerId);
+      if (!Number.isSafeInteger(partnerId) || partnerId <= 0) {
+        return res.status(400).json({ message: "A partnerId pozitív egész szám kell legyen." });
+      }
+    }
+
     const contacts = await contactService.getContacts({
       organizationId: req.organization.id,
+      partnerId,
     });
     return res.json(contacts);
   } catch (error) {

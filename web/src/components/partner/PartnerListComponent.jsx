@@ -128,7 +128,15 @@ export default function PartnerListComponent({
   }, [reloadKey]);
 
   return (
-    <section className="bg-[#f3f5f6] px-5 pb-5" aria-label="Partnerlista">
+    <section className="bg-[#f3f5f6] px-5 pb-5" aria-labelledby="partner-list-title">
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <p className="mb-1 text-[10px] font-semibold tracking-[.12em] text-[#8a9693] uppercase">Kapcsolatok</p>
+          <h2 id="partner-list-title" className="text-base font-semibold text-[#29383d]">Partnerek</h2>
+        </div>
+        <span className="text-xs text-[#7b8885]">{filteredPartners.length} találat</span>
+      </div>
+
       {selected.length > 0 && (
         <div
           className={`border border-[#dbe1df] bg-white px-4 py-2.5 text-xs font-medium text-[#4f7954] flex items-center justify-between ${

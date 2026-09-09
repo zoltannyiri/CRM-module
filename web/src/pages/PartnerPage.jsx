@@ -6,6 +6,7 @@ import PartnerFormComponent from "../components/partner/PartnerFormComponent.jsx
 import PartnerExportMenu from "../components/partner/PartnerExportMenu.jsx";
 import PartnerListComponent from "../components/partner/PartnerListComponent.jsx";
 import PartnerShowComponent from "../components/partner/PartnerShowComponent.jsx";
+import PartnerContactsComponent from "../components/partner/PartnerContactsComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 
 const iconPaths = {
@@ -112,6 +113,9 @@ export default function PartnerPage() {
           >
             <TabPanel header="Alapadatok">
               <PartnerShowComponent partnerId={id} />
+            </TabPanel>
+            <TabPanel header="Kapcsolattartók">
+              <PartnerContactsComponent key={id} partnerId={id} />
             </TabPanel>
           </TabView>
         </div>

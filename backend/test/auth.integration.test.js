@@ -237,6 +237,17 @@ test("auth and tenant authorization HTTP integration", {
         } })).status, 404);
         const list = await request("/api/contacts", { token: ownerToken });
         assert.deepEqual(list.body.map((contact) => contact.id), [contactId]);
+        const otherLocalPartner = await tx.partner.create({ data: { organizationId: org.id, name: "Second local company" } });
+        const otherLocalContact = await tx.contact.create({ data: { partnerId: otherLocalPartner.id, firstName: "Béla", lastName: "Másik" } });
+        const filtered = await request(`/api/contacts?partnerId=${localPartner.id}`, { token: ownerToken });
+        assert.deepEqual(filtered.body.map((contact) => contact.id), [contactId]);
+        const otherFiltered = await request(`/api/contacts?partnerId=${otherLocalPartner.id}`, { token: ownerToken });
+        assert.deepEqual(otherFiltered.body.map((contact) => contact.id), [otherLocalContact.id]);
+        const foreignFiltered = await request(`/api/contacts?partnerId=${foreignPartner.id}`, { token: ownerToken });
+        assert.deepEqual(foreignFiltered.body, []);
+        for (const invalidPartnerId of ["abc", "0", "-1", "1.5"]) {
+          assert.equal((await request(`/api/contacts?partnerId=${invalidPartnerId}`, { token: ownerToken })).status, 400);
+        }
         const csvExport = await request("/api/contacts/export?format=csv", { token: ownerToken });
         assert.equal(csvExport.status, 200);
         assert.match(csvExport.contentType, /text\/csv/);

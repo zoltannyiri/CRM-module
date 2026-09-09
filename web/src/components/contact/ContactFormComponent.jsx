@@ -15,7 +15,7 @@ const emptyForm = {
 const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3.5 text-sm text-[#263338] outline-none transition placeholder:text-[#a1abaa] focus:border-[#79a97e] focus:ring-2 focus:ring-[#79a97e]/15 disabled:cursor-default disabled:bg-[#f5f7f6] disabled:text-[#536166]";
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 
-export default function ContactFormComponent({ mode = "create", contact, onClose, onSaved }) {
+export default function ContactFormComponent({ mode = "create", contact, defaultPartnerId, onClose, onSaved }) {
   const [formData, setFormData] = useState(() => contact ? {
     partnerId: String(contact.partnerId),
     firstName: contact.firstName || "",
@@ -24,13 +24,14 @@ export default function ContactFormComponent({ mode = "create", contact, onClose
     email: contact.email || "",
     phone: contact.phone || "",
     note: contact.note || "",
-  } : emptyForm);
+  } : { ...emptyForm, partnerId: defaultPartnerId ? String(defaultPartnerId) : "" });
   const [partners, setPartners] = useState(() => contact?.partner ? [contact.partner] : []);
-  const [partnersLoading, setPartnersLoading] = useState(true);
+  const [partnersLoading, setPartnersLoading] = useState(() => !(defaultPartnerId && contact?.partner));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isEditing = mode === "edit";
   const isViewing = mode === "view";
+  const partnerLocked = Boolean(defaultPartnerId);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -46,10 +47,16 @@ export default function ContactFormComponent({ mode = "create", contact, onClose
   }, [onClose]);
 
   useEffect(() => {
+    if (partnerLocked && contact?.partner) return undefined;
+
     let active = true;
-    apiClient.get("/partners")
+    const request = partnerLocked
+      ? apiClient.get(`/partners/${defaultPartnerId}`)
+      : apiClient.get("/partners");
+
+    request
       .then(({ data }) => {
-        if (active) setPartners(data);
+        if (active) setPartners(partnerLocked ? [data] : data);
       })
       .catch((requestError) => {
         if (active) setError(requestError.message || "A partnerek betöltése sikertelen.");
@@ -60,7 +67,7 @@ export default function ContactFormComponent({ mode = "create", contact, onClose
     return () => {
       active = false;
     };
-  }, []);
+  }, [contact?.partner, defaultPartnerId, partnerLocked]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -111,7 +118,7 @@ export default function ContactFormComponent({ mode = "create", contact, onClose
               <h3 className="mb-5 text-sm font-semibold text-[#2b393e]">Alapadatok</h3>
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className={`${labelClass} sm:col-span-2`}>Partner
-                  <select name="partnerId" value={formData.partnerId} onChange={handleChange} disabled={isViewing || partnersLoading} required className={fieldClass}>
+                  <select name="partnerId" value={formData.partnerId} onChange={handleChange} disabled={isViewing || partnersLoading || partnerLocked} required className={fieldClass}>
                     <option value="">{partnersLoading ? "Partnerek betöltése…" : "Válassz partnert"}</option>
                     {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
                   </select>

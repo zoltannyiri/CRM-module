@@ -1,8 +1,9 @@
 import prisma from "../lib/prisma.js";
 
-async function getContacts({ organizationId }) {
+async function getContacts({ organizationId, partnerId }) {
   return prisma.contact.findMany({
     where: {
+      ...(partnerId ? { partnerId } : {}),
       partner: {
         organizationId,
       },
