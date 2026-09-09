@@ -8,6 +8,7 @@ import ContactPage from "./pages/ContactPage.jsx";
 import PartnerPage from "./pages/PartnerPage.jsx";
 import ProjectPage from "./pages/ProjectPage.jsx";
 import TaskPage from "./pages/TaskPage.jsx";
+import ActivityPage from "./pages/ActivityPage.jsx";
 
 function App() {
   return (
@@ -101,6 +102,19 @@ function App() {
                 <Sidebar />
                 <main className="min-w-0 flex-1" aria-label="Munkaterület">
                   <TaskPage />
+                </main>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/activity"
+          element={
+            <ProtectedRoute>
+              <div className="flex min-h-dvh bg-[#f6f8f9]">
+                <Sidebar />
+                <main className="min-w-0 flex-1" aria-label="Munkaterület">
+                  <ActivityPage />
                 </main>
               </div>
             </ProtectedRoute>

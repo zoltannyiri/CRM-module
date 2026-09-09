@@ -72,6 +72,7 @@ async function createPartner(req, res, next) {
 
     const partner = await partnerService.createPartner({
       organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
       name: name.trim(),
       phone,
       email,
@@ -93,6 +94,7 @@ async function updatePartner(req, res, next) {
     const partnerId = Number(req.params.id);
     const partner = await partnerService.updatePartner({
       organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
       partnerId,
       data: req.body,
     });
@@ -112,6 +114,7 @@ async function deletePartner(req, res, next) {
     const partnerId = Number(req.params.id);
     const partner = await partnerService.deletePartner({
       organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
       partnerId,
     });
     if (!partner) {

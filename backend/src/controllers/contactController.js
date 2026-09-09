@@ -82,6 +82,7 @@ async function createContact(req, res, next) {
     }
     const contact = await contactService.createContact({
       organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
       partnerId: Number(body.partnerId),
       data: contactData(body),
     });
@@ -100,6 +101,7 @@ async function updateContact(req, res, next) {
     }
     const contact = await contactService.updateContact({
       organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
       contactId: Number(req.params.id),
       partnerId: Number(body.partnerId),
       data: contactData(body),
@@ -115,6 +117,7 @@ async function deleteContact(req, res, next) {
   try {
     const deleted = await contactService.deleteContact({
       organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
       contactId: Number(req.params.id),
     });
     if (!deleted) return res.status(404).json({ message: "Kapcsolattartó nem található." });

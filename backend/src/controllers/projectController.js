@@ -88,7 +88,11 @@ async function createProject(req, res, next) {
   try {
     const normalized = normalizePayload(req.body);
     if (normalized.error) return res.status(400).json({ message: normalized.error });
-    const project = await projectService.createProject({ organizationId: req.organization.id, data: normalized.data });
+    const project = await projectService.createProject({
+      organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
+      data: normalized.data,
+    });
     if (!project) return res.status(404).json({ message: "Partner nem található." });
     return res.status(201).json(project);
   } catch (error) { return next(error); }
@@ -101,7 +105,12 @@ async function updateProject(req, res, next) {
     const allowedBody = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => EDITABLE_FIELDS.has(key)));
     const normalized = normalizePayload(allowedBody, { partial: true });
     if (normalized.error) return res.status(400).json({ message: normalized.error });
-    const project = await projectService.updateProject({ organizationId: req.organization.id, projectId, data: normalized.data });
+    const project = await projectService.updateProject({
+      organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
+      projectId,
+      data: normalized.data,
+    });
     if (!project) return res.status(404).json({ message: "Projekt vagy partner nem található." });
     return res.json(project);
   } catch (error) {
@@ -114,7 +123,11 @@ async function deleteProject(req, res, next) {
   try {
     const projectId = parsePositiveId(req.params.id);
     if (!projectId) return res.status(400).json({ message: "Érvénytelen projektazonosító." });
-    const deleted = await projectService.deleteProject({ organizationId: req.organization.id, projectId });
+    const deleted = await projectService.deleteProject({
+      organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
+      projectId,
+    });
     if (!deleted) return res.status(404).json({ message: "Projekt nem található." });
     return res.json({ message: "Projekt törölve." });
   } catch (error) { return next(error); }

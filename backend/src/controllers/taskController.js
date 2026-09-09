@@ -125,7 +125,11 @@ async function createTask(req, res, next) {
   try {
     const normalized = normalizePayload(req.body);
     if (normalized.error) return res.status(400).json({ message: normalized.error });
-    const task = await taskService.createTask({ organizationId: req.organization.id, data: normalized.data });
+    const task = await taskService.createTask({
+      organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
+      data: normalized.data,
+    });
     if (!task) return res.status(404).json({ message: "Projekt vagy szervezeti tag nem található." });
     return res.status(201).json(task);
   } catch (error) {
@@ -142,7 +146,12 @@ async function updateTask(req, res, next) {
     );
     const normalized = normalizePayload(allowedBody, { partial: true });
     if (normalized.error) return res.status(400).json({ message: normalized.error });
-    const task = await taskService.updateTask({ organizationId: req.organization.id, taskId, data: normalized.data });
+    const task = await taskService.updateTask({
+      organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
+      taskId,
+      data: normalized.data,
+    });
     if (!task) return res.status(404).json({ message: "Feladat, projekt vagy szervezeti tag nem található." });
     return res.json(task);
   } catch (error) {
@@ -154,7 +163,11 @@ async function deleteTask(req, res, next) {
   try {
     const taskId = parsePositiveId(req.params.id);
     if (!taskId) return res.status(400).json({ message: "Érvénytelen feladatazonosító." });
-    const deleted = await taskService.deleteTask({ organizationId: req.organization.id, taskId });
+    const deleted = await taskService.deleteTask({
+      organizationId: req.organization.id,
+      actorMemberId: req.membership?.id,
+      taskId,
+    });
     if (!deleted) return res.status(404).json({ message: "Feladat nem található." });
     return res.json({ message: "Feladat törölve." });
   } catch (error) {

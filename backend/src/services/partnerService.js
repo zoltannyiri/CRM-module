@@ -1,6 +1,5 @@
 import prisma from "../lib/prisma.js";
-
-
+import activityService from "./activityService.js";
 
 async function getPartners({ organizationId }) {
   const partners = await prisma.partner.findMany({
@@ -48,56 +47,116 @@ async function getPartnerById({ partnerId, organizationId }) {
     include: {
       contacts: true,
     },
-  })
-}
-
-async function createPartner({ organizationId, note, address, taxNumber, website, phone, email, name, type }) {
-  return prisma.partner.create({
-    data: {
-      organizationId,
-      note,
-      address,
-      taxNumber,
-      website,
-      phone,
-      email,
-      name,
-      type,
-    },
-    include: {
-      contacts: true,
-    },
   });
 }
 
-async function updatePartner({ organizationId, partnerId, data }) {
-  // Never accept tenant IDs, primary keys or nested relation writes from the body.
+async function createPartner({ organizationId, actorMemberId, note, address, taxNumber, website, phone, email, name, type }) {
+  return prisma.$transaction(async (tx) => {
+    const partner = await tx.partner.create({
+      data: {
+        organizationId,
+        note,
+        address,
+        taxNumber,
+        website,
+        phone,
+        email,
+        name,
+        type,
+      },
+      include: {
+        contacts: true,
+      },
+    });
+
+    await activityService.createActivity(
+      {
+        organizationId,
+        actorMemberId,
+        entityType: "PARTNER",
+        entityId: partner.id,
+        action: "CREATED",
+        title: "Partner létrehozva",
+        description: partner.name,
+        metadata: { type: partner.type, name: partner.name },
+      },
+      tx,
+    );
+
+    return partner;
+  });
+}
+
+async function updatePartner({ organizationId, actorMemberId, partnerId, data }) {
   const fields = ["name", "email", "phone", "type", "address", "website", "taxNumber", "note"];
   const changes = Object.fromEntries(
-    fields.filter((field) => Object.hasOwn(data, field)).map((field) => [field, data[field]])
+    fields.filter((field) => Object.hasOwn(data, field)).map((field) => [field, data[field]]),
   );
 
-  try {
-    return await prisma.partner.update({
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.partner.findFirst({
+      where: { id: partnerId, organizationId },
+    });
+    if (!existing) return null;
+
+    const changedFields = Object.keys(changes).filter((field) => {
+      const oldVal = existing[field] ?? null;
+      const newVal = changes[field] ?? null;
+      return oldVal !== newVal;
+    });
+
+    const updated = await tx.partner.update({
       where: { id: partnerId, organizationId },
       data: changes,
       include: { contacts: true },
     });
-  } catch (error) {
-    if (error.code === "P2025") return null;
-    throw error;
-  }
+
+    if (changedFields.length > 0) {
+      await activityService.createActivity(
+        {
+          organizationId,
+          actorMemberId,
+          entityType: "PARTNER",
+          entityId: updated.id,
+          action: "UPDATED",
+          title: "Partner módosítva",
+          description: updated.name,
+          metadata: { changedFields },
+        },
+        tx,
+      );
+    }
+
+    return updated;
+  });
 }
 
-async function deletePartner({ organizationId, partnerId }) {
-  try {
-    return await prisma.partner.delete({
+async function deletePartner({ organizationId, actorMemberId, partnerId }) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.partner.findFirst({
+      where: { id: partnerId, organizationId },
+      select: { id: true, name: true },
+    });
+    if (!existing) return null;
+
+    await activityService.createActivity(
+      {
+        organizationId,
+        actorMemberId,
+        entityType: "PARTNER",
+        entityId: partnerId,
+        action: "DELETED",
+        title: "Partner törölve",
+        description: existing.name,
+        metadata: { name: existing.name },
+      },
+      tx,
+    );
+
+    return tx.partner.delete({
       where: { id: partnerId, organizationId },
     });
-  } catch (error) {
-    if (error.code === "P2025") return null;
-    throw error;
-  }
+  });
 }
 
 export default {

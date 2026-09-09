@@ -40,6 +40,22 @@ enum TaskPriority {
   URGENT
 }
 
+enum ActivityEntityType {
+  PARTNER
+  CONTACT
+  PROJECT
+  TASK
+}
+
+enum ActivityAction {
+  CREATED
+  UPDATED
+  DELETED
+  STATUS_CHANGED
+  ASSIGNED
+  PRIORITY_CHANGED
+}
+
 enum ModuleKey {
   PARTNERS
 
@@ -69,6 +85,7 @@ model Organization {
   invitations Invitation[]
   modules     OrganizationModule[]
   tasks       Task[]
+  activities  Activity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -97,6 +114,7 @@ model OrganizationMember {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assignedTasks Task[]
+  activities    Activity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -247,4 +265,24 @@ model Task {
   @@index([assigneeMemberId])
   @@index([organizationId, status])
   @@index([organizationId, priority])
+}
+
+model Activity {
+  id             Int                 @id @default(autoincrement())
+  organizationId Int
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorMemberId  Int?
+  actorMember    OrganizationMember? @relation(fields: [actorMemberId], references: [id], onDelete: SetNull)
+  entityType     ActivityEntityType
+  entityId       Int
+  action         ActivityAction
+  title          String
+  description    String?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, entityType, entityId])
+  @@index([actorMemberId])
+  @@index([createdAt])
 }
