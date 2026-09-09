@@ -80,6 +80,19 @@ function App() {
           }
         />
         <Route
+          path="/project/:id"
+          element={
+            <ProtectedRoute>
+              <div className="flex min-h-dvh bg-[#f6f8f9]">
+                <Sidebar />
+                <main className="min-w-0 flex-1" aria-label="Munkaterület">
+                  <ProjectPage />
+                </main>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/"
           element={
             <ProtectedRoute>

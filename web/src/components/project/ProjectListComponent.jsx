@@ -21,7 +21,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("hu-HU", { timeZone: "UTC" }).format(new Date(value));
 }
 
-export default function ProjectListComponent({ query = "", statusFilter = "ALL", partnerFilter = "", sortDirection = "desc", reloadKey = 0, onEdit }) {
+export default function ProjectListComponent({ query = "", statusFilter = "ALL", partnerFilter = "", sortDirection = "desc", reloadKey = 0, onView, onEdit }) {
   const [result, setResult] = useState({ projects: [], resolvedKey: null, error: "" });
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -71,10 +71,11 @@ export default function ProjectListComponent({ query = "", statusFilter = "ALL",
   };
 
   const checkboxTemplate = (project) => <input type="checkbox" checked={selected.includes(project.id)} onChange={() => toggleProject(project.id)} aria-label={`${project.name} kijelölése`} className="size-4 cursor-pointer rounded-sm accent-[#78ad7d]" />;
-  const nameTemplate = (project) => <div><p className="font-medium text-[#263338]">{project.name}</p>{project.description && <p className="mt-0.5 max-w-72 truncate text-[11px] text-[#84908e]">{project.description}</p>}</div>;
+  const nameTemplate = (project) => <div><button type="button" onClick={() => onView?.(project)} className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium text-[#263338] hover:underline">{project.name}</button>{project.description && <p className="mt-0.5 max-w-72 truncate text-[11px] text-[#84908e]">{project.description}</p>}</div>;
   const statusTemplate = (project) => <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium ${statusClasses[project.status]}`}>{statusLabels[project.status]}</span>;
   const actionTemplate = (project) => (
     <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+      <button type="button" onClick={() => onView?.(project)} aria-label={`${project.name} megtekintése`} title="Megtekintés" className={actionButtonClass}><i className="pi pi-eye" aria-hidden="true" /></button>
       <button type="button" onClick={() => onEdit?.(project)} aria-label={`${project.name} módosítása`} title="Módosítás" className={actionButtonClass}><i className="pi pi-pencil" aria-hidden="true" /></button>
       <button type="button" onClick={() => handleDelete(project)} disabled={deletingId === project.id} aria-label={`${project.name} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === project.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>
     </div>
@@ -94,7 +95,7 @@ export default function ProjectListComponent({ query = "", statusFilter = "ALL",
           <Column header="Kezdés" body={(project) => formatDate(project.startDate)} headerClassName={`${headerClass} w-[12%]`} bodyClassName={`${cellClass} w-[12%] whitespace-nowrap`} />
           <Column header="Határidő" body={(project) => formatDate(project.deadline)} headerClassName={`${headerClass} w-[12%]`} bodyClassName={`${cellClass} w-[12%] whitespace-nowrap`} />
           <Column header="Módosítva" body={(project) => formatDate(project.updatedAt)} headerClassName={`${headerClass} w-[12%]`} bodyClassName={`${cellClass} w-[12%] whitespace-nowrap`} />
-          <Column header="Műveletek" body={actionTemplate} headerClassName={`${headerClass} w-[104px] !px-2 text-center`} bodyClassName={`${cellClass} w-[104px] !px-2`} />
+          <Column header="Műveletek" body={actionTemplate} headerClassName={`${headerClass} w-[136px] !px-2 text-center`} bodyClassName={`${cellClass} w-[136px] !px-2`} />
         </DataTable>
       </div>
       <nav className="mt-5 flex justify-center" aria-label="Projektlista lapozása"><div className="inline-flex overflow-hidden rounded-md border border-[#d6dddc] bg-white"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => value - 1)} className="h-9 cursor-pointer border-0 border-r border-[#dfe4e3] bg-white px-3 text-xs hover:bg-[#f7f8f8] disabled:cursor-not-allowed disabled:opacity-40">Előző</button>{Array.from({ length: pageCount }, (_, index) => index + 1).map((number) => <button key={number} type="button" onClick={() => setPage(number)} aria-current={number === currentPage ? "page" : undefined} className={`size-9 cursor-pointer border-0 border-r border-[#dfe4e3] text-xs ${number === currentPage ? "bg-[#f0f3f2] font-semibold" : "bg-white hover:bg-[#f7f8f8]"}`}>{number}</button>)}<button type="button" disabled={currentPage === pageCount} onClick={() => setPage((value) => value + 1)} className="h-9 cursor-pointer border-0 bg-white px-3 text-xs hover:bg-[#f7f8f8] disabled:cursor-not-allowed disabled:opacity-40">Következő</button></div></nav>
