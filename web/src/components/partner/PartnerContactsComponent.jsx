@@ -2,10 +2,17 @@ import { useEffect, useState } from "react";
 
 import apiClient from "../../api/apiClient.js";
 import ContactFormComponent from "../contact/ContactFormComponent.jsx";
+import { useAuth } from "../../hooks/useAuth.js";
+import { useToast } from "../../hooks/useToast.js";
 
 const actionButtonClass = "grid size-8 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-xs text-[#657276] transition hover:border-[#d8dfdd] hover:bg-[#f1f4f3] hover:text-[#27373c] disabled:cursor-wait disabled:opacity-50";
 
 export default function PartnerContactsComponent({ partnerId }) {
+  const { hasPermission } = useAuth();
+  const { showSuccess } = useToast();
+  const canCreate = hasPermission("PARTNERS_CREATE");
+  const canEdit = hasPermission("PARTNERS_EDIT");
+  const canDelete = hasPermission("PARTNERS_DELETE");
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -67,6 +74,7 @@ export default function PartnerContactsComponent({ partnerId }) {
     try {
       await apiClient.delete(`/contacts/${contact.id}`);
       setContacts((current) => current.filter(({ id }) => id !== contact.id));
+      showSuccess("A kapcsolattartó sikeresen törölve.");
     } catch {
       setError("A kapcsolattartó törlése sikertelen.");
     } finally {
@@ -81,10 +89,10 @@ export default function PartnerContactsComponent({ partnerId }) {
           <h2 id="partner-contacts-title" className="text-base font-semibold text-[#29383d]">Kapcsolattartók</h2>
           <p className="mt-1 text-xs text-[#71807c]">A partnerhez tartozó személyek és elérhetőségeik.</p>
         </div>
-        <button type="button" onClick={openCreate} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#68aa6e]">
+        {canCreate && <button type="button" onClick={openCreate} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#68aa6e]">
           <i className="pi pi-plus text-[10px]" aria-hidden="true" />
           Új kapcsolattartó
-        </button>
+        </button>}
       </div>
 
       <div className="relative overflow-hidden rounded-xl border border-[#dbe1df] bg-white" aria-busy={loading}>
@@ -112,7 +120,7 @@ export default function PartnerContactsComponent({ partnerId }) {
             <div>
               <span className="mx-auto grid size-11 place-items-center rounded-full bg-[#eff6ee] text-[#69a46e]"><i className="pi pi-users text-base" aria-hidden="true" /></span>
               <p className="mt-4 text-sm font-medium text-[#344247]">Ehhez a partnerhez még nincs kapcsolattartó.</p>
-              <button type="button" onClick={openCreate} className="mt-4 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white hover:bg-[#68aa6e]"><i className="pi pi-plus text-[10px]" aria-hidden="true" />Új kapcsolattartó</button>
+              {canCreate && <button type="button" onClick={openCreate} className="mt-4 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white hover:bg-[#68aa6e]"><i className="pi pi-plus text-[10px]" aria-hidden="true" />Új kapcsolattartó</button>}
             </div>
           </div>
         ) : (
@@ -127,8 +135,8 @@ export default function PartnerContactsComponent({ partnerId }) {
                   <span className="whitespace-nowrap"><span className="mr-2 text-[#8a9693] md:hidden">Telefon:</span>{contact.phone || "—"}</span>
                   <div className="flex items-center gap-1 md:justify-center">
                     <button type="button" onClick={() => openContact(contact, "view")} aria-label={`${fullName} megtekintése`} title="Megtekintés" className={actionButtonClass}><i className="pi pi-eye" aria-hidden="true" /></button>
-                    <button type="button" onClick={() => openContact(contact, "edit")} aria-label={`${fullName} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil" aria-hidden="true" /></button>
-                    <button type="button" onClick={() => handleDelete(contact)} disabled={deletingId === contact.id} aria-label={`${fullName} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>
+                    {canEdit && <button type="button" onClick={() => openContact(contact, "edit")} aria-label={`${fullName} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil" aria-hidden="true" /></button>}
+                    {canDelete && <button type="button" onClick={() => handleDelete(contact)} disabled={deletingId === contact.id} aria-label={`${fullName} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>}
                   </div>
                 </div>
               );

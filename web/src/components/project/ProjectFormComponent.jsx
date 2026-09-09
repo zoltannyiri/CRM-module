@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import apiClient from "../../api/apiClient.js";
+import { useToast } from "../../hooks/useToast.js";
+import { useAuth } from "../../hooks/useAuth.js";
 
 const emptyForm = {
   name: "",
@@ -19,6 +21,9 @@ function dateInputValue(value) {
 }
 
 export default function ProjectFormComponent({ mode = "create", project, onClose, onSaved }) {
+  const { showSuccess } = useToast();
+  const { hasModule, hasPermission } = useAuth();
+  const canUsePartners = hasModule("PARTNERS") && hasPermission("PARTNERS_VIEW");
   const [formData, setFormData] = useState(() => project ? {
     name: project.name || "",
     partnerId: project.partnerId ? String(project.partnerId) : "",
@@ -28,7 +33,7 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
     description: project.description || "",
   } : emptyForm);
   const [partners, setPartners] = useState(() => project?.partner ? [project.partner] : []);
-  const [partnersLoading, setPartnersLoading] = useState(true);
+  const [partnersLoading, setPartnersLoading] = useState(canUsePartners);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isEditing = mode === "edit";
@@ -45,6 +50,7 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
   }, [onClose]);
 
   useEffect(() => {
+    if (!canUsePartners) return undefined;
     let active = true;
     apiClient.get("/partners")
       .then(({ data }) => {
@@ -60,7 +66,7 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
         if (active) setPartnersLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [canUsePartners]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -78,7 +84,7 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
     setError("");
     const payload = {
       name: formData.name.trim(),
-      partnerId: formData.partnerId ? Number(formData.partnerId) : null,
+      ...(canUsePartners ? { partnerId: formData.partnerId ? Number(formData.partnerId) : null } : {}),
       status: formData.status,
       startDate: formData.startDate || null,
       deadline: formData.deadline || null,
@@ -90,6 +96,7 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
         ? await apiClient.patch(`/projects/${project.id}`, payload)
         : await apiClient.post("/projects", payload);
       onSaved?.(response.data);
+      showSuccess(isEditing ? "A projekt adatai sikeresen módosultak." : "A projekt sikeresen létrejött.");
       onClose();
     } catch (requestError) {
       setError(requestError.message || "A projekt mentése sikertelen.");
@@ -120,12 +127,12 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
                 <label className={`${labelClass} sm:col-span-2`}>Projekt neve
                   <input name="name" value={formData.name} onChange={handleChange} className={fieldClass} placeholder="Projekt neve" required autoFocus />
                 </label>
-                <label className={labelClass}>Partner
+                {canUsePartners && <label className={labelClass}>Partner
                   <select name="partnerId" value={formData.partnerId} onChange={handleChange} disabled={partnersLoading} className={`${fieldClass} disabled:cursor-wait disabled:bg-[#f5f7f6]`}>
                     <option value="">{partnersLoading ? "Partnerek betöltése…" : "Nincs partner hozzárendelve"}</option>
                     {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
                   </select>
-                </label>
+                </label>}
                 <label className={labelClass}>Státusz
                   <select name="status" value={formData.status} onChange={handleChange} className={fieldClass}>
                     <option value="PLANNED">Tervezett</option>
@@ -157,7 +164,7 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
 
         <footer className="flex justify-end gap-3 border-t border-[#dfe5e3] bg-white px-7 py-4">
           <button type="button" onClick={onClose} className="h-10 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-5 text-xs font-medium text-[#455358] hover:bg-[#f5f7f6]">Mégse</button>
-          <button type="submit" form="project-form" disabled={submitting || partnersLoading} className="h-10 cursor-pointer rounded-md border border-[#1e3338] bg-[#263b40] px-6 text-xs font-semibold text-white hover:bg-[#1c3035] disabled:cursor-wait disabled:opacity-60">{submitting ? "Mentés…" : isEditing ? "Módosítások mentése" : "Projekt létrehozása"}</button>
+          <button type="submit" form="project-form" disabled={submitting || (canUsePartners && partnersLoading)} className="h-10 cursor-pointer rounded-md border border-[#1e3338] bg-[#263b40] px-6 text-xs font-semibold text-white hover:bg-[#1c3035] disabled:cursor-wait disabled:opacity-60">{submitting ? "Mentés…" : isEditing ? "Módosítások mentése" : "Projekt létrehozása"}</button>
         </footer>
       </aside>
     </div>

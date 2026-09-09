@@ -74,6 +74,26 @@ enum ModuleKey {
   MAINTENANCE
 }
 
+enum PermissionKey {
+  PARTNERS_VIEW
+  PARTNERS_CREATE
+  PARTNERS_EDIT
+  PARTNERS_DELETE
+
+  PROJECTS_VIEW
+  PROJECTS_CREATE
+  PROJECTS_EDIT
+  PROJECTS_DELETE
+
+  TASKS_VIEW
+  TASKS_CREATE
+  TASKS_EDIT
+  TASKS_DELETE
+  TASKS_ASSIGN
+
+  ACTIVITY_VIEW
+}
+
 model Organization {
   id   Int    @id @default(autoincrement())
   name String
@@ -115,6 +135,7 @@ model OrganizationMember {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assignedTasks Task[]
   activities    Activity[]
+  permissions   OrganizationMemberPermission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,6 +143,19 @@ model OrganizationMember {
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
+}
+
+model OrganizationMemberPermission {
+  id Int @id @default(autoincrement())
+
+  organizationMemberId Int
+  organizationMember   OrganizationMember @relation(fields: [organizationMemberId], references: [id], onDelete: Cascade)
+
+  permission PermissionKey
+  createdAt  DateTime @default(now())
+
+  @@unique([organizationMemberId, permission])
+  @@index([organizationMemberId])
 }
 
 model OrganizationModule {

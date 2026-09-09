@@ -1,4 +1,5 @@
 import taskService from "../services/taskService.js";
+import permissionService from "../services/permissionService.js";
 
 const TASK_STATUSES = new Set(["TODO", "IN_PROGRESS", "BLOCKED", "DONE", "CANCELLED"]);
 const TASK_PRIORITIES = new Set(["LOW", "MEDIUM", "HIGH", "URGENT"]);
@@ -125,6 +126,17 @@ async function createTask(req, res, next) {
   try {
     const normalized = normalizePayload(req.body);
     if (normalized.error) return res.status(400).json({ message: normalized.error });
+
+    if (normalized.data.assigneeMemberId !== null && normalized.data.assigneeMemberId !== undefined) {
+      if (!(await permissionService.hasPermission(req.membership, "TASKS_ASSIGN"))) {
+        return res.status(403).json({
+          message: "Nincs jogosultsága felelős hozzárendeléséhez.",
+          code: "PERMISSION_DENIED",
+          permission: "TASKS_ASSIGN",
+        });
+      }
+    }
+
     const task = await taskService.createTask({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id,
@@ -146,6 +158,21 @@ async function updateTask(req, res, next) {
     );
     const normalized = normalizePayload(allowedBody, { partial: true });
     if (normalized.error) return res.status(400).json({ message: normalized.error });
+
+    if (normalized.data.assigneeMemberId !== undefined) {
+      const existingTask = await taskService.getTaskById({ organizationId: req.organization.id, taskId });
+      if (!existingTask) return res.status(404).json({ message: "Feladat nem található." });
+      if (existingTask.assigneeMemberId !== normalized.data.assigneeMemberId) {
+        if (!(await permissionService.hasPermission(req.membership, "TASKS_ASSIGN"))) {
+          return res.status(403).json({
+            message: "Nincs jogosultsága felelős módosításához.",
+            code: "PERMISSION_DENIED",
+            permission: "TASKS_ASSIGN",
+          });
+        }
+      }
+    }
+
     const task = await taskService.updateTask({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id,

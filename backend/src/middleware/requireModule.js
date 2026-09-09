@@ -12,6 +12,7 @@ export default function requireModule(moduleKey) {
       if (!enabled) {
         return res.status(403).json({
           message: "Ez a modul nincs engedélyezve a szervezet számára.",
+          code: "MODULE_DISABLED",
           module: moduleKey,
         });
       }

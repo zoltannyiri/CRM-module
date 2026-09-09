@@ -10,6 +10,19 @@ import ProjectPage from "./pages/ProjectPage.jsx";
 import TaskPage from "./pages/TaskPage.jsx";
 import ActivityPage from "./pages/ActivityPage.jsx";
 import ModuleRoute from "./components/ModuleRoute.jsx";
+import PermissionRoute from "./components/PermissionRoute.jsx";
+import SettingsPermissionsPage from "./pages/SettingsPermissionsPage.jsx";
+
+function Workspace({ children }) {
+  return (
+    <ProtectedRoute>
+      <div className="flex min-h-dvh bg-[#f6f8f9]">
+        <Sidebar />
+        <main className="min-w-0 flex-1" aria-label="Munkaterület">{children}</main>
+      </div>
+    </ProtectedRoute>
+  );
+}
 
 function App() {
   return (
@@ -20,118 +33,53 @@ function App() {
         <Route
           path="/partner"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ModuleRoute module="PARTNERS"><PartnerPage /></ModuleRoute>
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><ModuleRoute module="PARTNERS"><PermissionRoute permission="PARTNERS_VIEW"><PartnerPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route
           path="/partner/:id"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ModuleRoute module="PARTNERS"><PartnerPage /></ModuleRoute>
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><ModuleRoute module="PARTNERS"><PermissionRoute permission="PARTNERS_VIEW"><PartnerPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route
           path="/contact"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ModuleRoute module="PARTNERS"><ContactPage /></ModuleRoute>
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><ModuleRoute module="PARTNERS"><PermissionRoute permission="PARTNERS_VIEW"><ContactPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route
           path="/contact/:id"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ModuleRoute module="PARTNERS"><ContactPage /></ModuleRoute>
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><ModuleRoute module="PARTNERS"><PermissionRoute permission="PARTNERS_VIEW"><ContactPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route
           path="/project"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ModuleRoute module="PROJECTS"><ProjectPage /></ModuleRoute>
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><ModuleRoute module="PROJECTS"><PermissionRoute permission="PROJECTS_VIEW"><ProjectPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route
           path="/project/:id"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ModuleRoute module="PROJECTS"><ProjectPage /></ModuleRoute>
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><ModuleRoute module="PROJECTS"><PermissionRoute permission="PROJECTS_VIEW"><ProjectPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route
           path="/task"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ModuleRoute module="TASKS"><TaskPage /></ModuleRoute>
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><ModuleRoute module="TASKS"><PermissionRoute permission="TASKS_VIEW"><TaskPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route
           path="/activity"
           element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület">
-                  <ActivityPage />
-                </main>
-              </div>
-            </ProtectedRoute>
+            <Workspace><PermissionRoute permission="ACTIVITY_VIEW"><ActivityPage /></PermissionRoute></Workspace>
           }
         />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <div className="flex min-h-dvh bg-[#f6f8f9]">
-                <Sidebar />
-                <main className="min-w-0 flex-1" aria-label="Munkaterület" />
-              </div>
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/settings/permissions" element={<Workspace><SettingsPermissionsPage /></Workspace>} />
+        <Route path="/" element={<Workspace />} />
       </Routes>
     </BrowserRouter>
   );

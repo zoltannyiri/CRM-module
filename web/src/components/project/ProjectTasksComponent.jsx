@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import apiClient from "../../api/apiClient.js";
 import TaskFormComponent from "../task/TaskFormComponent.jsx";
+import { useAuth } from "../../hooks/useAuth.js";
+import { useToast } from "../../hooks/useToast.js";
 
 const actionButtonClass = "grid size-8 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-xs text-[#657276] transition hover:border-[#d8dfdd] hover:bg-[#f1f4f3] hover:text-[#27373c] disabled:cursor-wait disabled:opacity-50";
 
@@ -27,6 +29,12 @@ function formatDate(value) {
 }
 
 export default function ProjectTasksComponent({ projectId }) {
+  const { hasPermission } = useAuth();
+  const { showSuccess } = useToast();
+  const canCreate = hasPermission("TASKS_CREATE");
+  const canEdit = hasPermission("TASKS_EDIT");
+  const canDelete = hasPermission("TASKS_DELETE");
+  const canAssign = hasPermission("TASKS_ASSIGN");
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,6 +95,7 @@ export default function ProjectTasksComponent({ projectId }) {
     try {
       await apiClient.delete(`/tasks/${task.id}`);
       setTasks((current) => current.filter(({ id }) => id !== task.id));
+      showSuccess("A feladat sikeresen törölve.");
     } catch {
       setError("A feladat törlése sikertelen.");
     } finally {
@@ -101,10 +110,10 @@ export default function ProjectTasksComponent({ projectId }) {
           <h2 id="project-tasks-title" className="text-base font-semibold text-[#29383d]">Feladatok</h2>
           <p className="mt-1 text-xs text-[#71807c]">A projekthez tartozó feladatok és állapotuk.</p>
         </div>
-        <button type="button" onClick={openCreate} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#68aa6e]">
+        {canCreate && <button type="button" onClick={openCreate} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#68aa6e]">
           <i className="pi pi-plus text-[10px]" aria-hidden="true" />
           Új feladat
-        </button>
+        </button>}
       </div>
 
       <div className="relative overflow-hidden rounded-xl border border-[#dbe1df] bg-white" aria-busy={loading}>
@@ -133,7 +142,7 @@ export default function ProjectTasksComponent({ projectId }) {
             <div>
               <span className="mx-auto grid size-11 place-items-center rounded-full bg-[#eff6ee] text-[#69a46e]"><i className="pi pi-check-circle text-base" aria-hidden="true" /></span>
               <p className="mt-4 text-sm font-medium text-[#344247]">Ehhez a projekthez még nincs feladat.</p>
-              <button type="button" onClick={openCreate} className="mt-4 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white hover:bg-[#68aa6e]"><i className="pi pi-plus text-[10px]" aria-hidden="true" />Új feladat</button>
+              {canCreate && <button type="button" onClick={openCreate} className="mt-4 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#6dab72] bg-[#78b97d] px-4 text-xs font-semibold text-white hover:bg-[#68aa6e]"><i className="pi pi-plus text-[10px]" aria-hidden="true" />Új feladat</button>}
             </div>
           </div>
         ) : (
@@ -141,14 +150,14 @@ export default function ProjectTasksComponent({ projectId }) {
             {tasks.map((task) => {
               return (
                 <div key={task.id} className="grid gap-2 px-4 py-3.5 text-xs text-[#344247] transition-colors hover:bg-[#fafcfc] md:grid-cols-[minmax(150px,1.5fr)_90px_90px_minmax(110px,.9fr)_100px_108px] md:items-center md:gap-0">
-                  <button type="button" onClick={() => openEdit(task)} className="cursor-pointer border-0 bg-transparent p-0 text-left font-semibold text-[#263338] hover:underline truncate mr-2">{task.title}</button>
+                  {canEdit ? <button type="button" onClick={() => openEdit(task)} className="cursor-pointer border-0 bg-transparent p-0 text-left font-semibold text-[#263338] hover:underline truncate mr-2">{task.title}</button> : <span className="truncate mr-2 font-semibold text-[#263338]">{task.title}</span>}
                   <span><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium ${statusClasses[task.status]}`}>{statusLabels[task.status]}</span></span>
                   <span><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span></span>
                   <span className="truncate mr-2">{task.assigneeMember?.user ? `${task.assigneeMember.user.firstName} ${task.assigneeMember.user.lastName}` : "—"}</span>
                   <span className="whitespace-nowrap">{formatDate(task.dueDate)}</span>
                   <div className="flex items-center gap-1 md:justify-center">
-                    <button type="button" onClick={() => openEdit(task)} aria-label={`${task.title} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil pointer-events-none" aria-hidden="true" /></button>
-                    <button type="button" onClick={() => handleDelete(task)} disabled={deletingId === task.id} aria-label={`${task.title} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === task.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`} aria-hidden="true" /></button>
+                    {canEdit && <button type="button" onClick={() => openEdit(task)} aria-label={`${task.title} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil pointer-events-none" aria-hidden="true" /></button>}
+                    {canDelete && <button type="button" onClick={() => handleDelete(task)} disabled={deletingId === task.id} aria-label={`${task.title} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === task.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`} aria-hidden="true" /></button>}
                   </div>
                 </div>
               );
@@ -162,6 +171,7 @@ export default function ProjectTasksComponent({ projectId }) {
           mode={formMode}
           task={activeTask}
           defaultProjectId={projectId}
+          canAssign={canAssign}
           onClose={() => setFormOpen(false)}
           onSaved={handleSaved}
         />

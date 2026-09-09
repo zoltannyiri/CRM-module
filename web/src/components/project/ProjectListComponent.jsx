@@ -3,6 +3,7 @@ import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
 
 import apiClient from "../../api/apiClient.js";
+import { useToast } from "../../hooks/useToast.js";
 
 const cellClass = "h-[58px] border-r border-b border-[#e1e6e4] px-4 text-xs text-[#344247] last:border-r-0";
 const headerClass = "h-12 border-r border-b border-[#dbe1df] px-4 text-left text-[11px] font-medium text-[#445156] last:border-r-0";
@@ -21,7 +22,8 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("hu-HU", { timeZone: "UTC" }).format(new Date(value));
 }
 
-export default function ProjectListComponent({ query = "", statusFilter = "ALL", partnerFilter = "", sortDirection = "desc", reloadKey = 0, onView, onEdit }) {
+export default function ProjectListComponent({ query = "", statusFilter = "ALL", partnerFilter = "", sortDirection = "desc", reloadKey = 0, onView, onEdit, canEdit = false, canDelete = false }) {
+  const { showSuccess } = useToast();
   const [result, setResult] = useState({ projects: [], resolvedKey: null, error: "" });
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -65,6 +67,7 @@ export default function ProjectListComponent({ query = "", statusFilter = "ALL",
       await apiClient.delete(`/projects/${project.id}`);
       setResult((current) => ({ ...current, projects: current.projects.filter(({ id }) => id !== project.id), error: "" }));
       setSelected((current) => current.filter((id) => id !== project.id));
+      showSuccess("A projekt sikeresen törölve.");
     } catch (error) {
       setResult((current) => ({ ...current, error: error.message || "A projekt törlése sikertelen." }));
     } finally { setDeletingId(null); }
@@ -76,8 +79,8 @@ export default function ProjectListComponent({ query = "", statusFilter = "ALL",
   const actionTemplate = (project) => (
     <div className="flex items-center justify-center gap-1 whitespace-nowrap">
       <button type="button" onClick={() => onView?.(project)} aria-label={`${project.name} megtekintése`} title="Megtekintés" className={actionButtonClass}><i className="pi pi-eye" aria-hidden="true" /></button>
-      <button type="button" onClick={() => onEdit?.(project)} aria-label={`${project.name} módosítása`} title="Módosítás" className={actionButtonClass}><i className="pi pi-pencil" aria-hidden="true" /></button>
-      <button type="button" onClick={() => handleDelete(project)} disabled={deletingId === project.id} aria-label={`${project.name} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === project.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>
+      {canEdit && <button type="button" onClick={() => onEdit?.(project)} aria-label={`${project.name} módosítása`} title="Módosítás" className={actionButtonClass}><i className="pi pi-pencil" aria-hidden="true" /></button>}
+      {canDelete && <button type="button" onClick={() => handleDelete(project)} disabled={deletingId === project.id} aria-label={`${project.name} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === project.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>}
     </div>
   );
 

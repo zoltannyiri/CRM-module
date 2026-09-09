@@ -141,7 +141,7 @@ export default function PartnerCardView({
                       <i className="pi pi-eye pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
                       <span>Megtekintés</span>
                     </button>
-                    <button
+                    {onEdit && <button
                       type="button"
                       role="menuitem"
                       onClick={(event) => {
@@ -153,8 +153,8 @@ export default function PartnerCardView({
                     >
                       <i className="pi pi-pencil pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
                       <span>Módosítás</span>
-                    </button>
-                    <button
+                    </button>}
+                    {onDelete && <button
                       type="button"
                       role="menuitem"
                       onClick={(event) => {
@@ -170,7 +170,7 @@ export default function PartnerCardView({
                         aria-hidden="true"
                       />
                       <span>Törlés</span>
-                    </button>
+                    </button>}
                   </div>
                 )}
               </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import apiClient from "../../api/apiClient.js";
 import ContactTableView from "./ContactTableView.jsx";
 import ContactCardView from "./ContactCardView.jsx";
+import { useToast } from "../../hooks/useToast.js";
 
 const iconPaths = {
   left: <path d="m15 18-6-6 6-6" />,
@@ -42,7 +43,10 @@ export default function ContactListComponent({
   viewMode: controlledViewMode,
   onView,
   onEdit,
+  canEdit = false,
+  canDelete = false,
 }) {
+  const { showSuccess } = useToast();
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -118,6 +122,7 @@ export default function ContactListComponent({
       await apiClient.delete(`/contacts/${contact.id}`);
       setContacts((current) => current.filter(({ id }) => id !== contact.id));
       setSelected((current) => current.filter((id) => id !== contact.id));
+      showSuccess("A kapcsolattartó sikeresen törölve.");
     } catch (error) {
       setLoadError(error.message || "A kapcsolattartó törlése sikertelen.");
     } finally {
@@ -162,8 +167,8 @@ export default function ContactListComponent({
           onToggleSelect={toggleContact}
           onToggleAll={toggleAll}
           onView={onView}
-          onEdit={onEdit}
-          onDelete={handleDelete}
+          onEdit={canEdit ? onEdit : undefined}
+          onDelete={canDelete ? handleDelete : undefined}
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}
@@ -176,8 +181,8 @@ export default function ContactListComponent({
           onToggleSelect={toggleContact}
           onToggleAll={toggleAll}
           onView={onView}
-          onEdit={onEdit}
-          onDelete={handleDelete}
+          onEdit={canEdit ? onEdit : undefined}
+          onDelete={canDelete ? handleDelete : undefined}
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}

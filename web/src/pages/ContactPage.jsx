@@ -7,6 +7,7 @@ import ContactExportMenu from "../components/contact/ContactExportMenu.jsx";
 import ContactListComponent from "../components/contact/ContactListComponent.jsx";
 import ContactShowComponent from "../components/contact/ContactShowComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
+import { useAuth } from "../hooks/useAuth.js";
 
 const lightButton =
   "inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
@@ -21,6 +22,7 @@ function getStoredViewMode() {
 }
 
 export default function ContactPage() {
+  const { hasPermission } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -100,7 +102,7 @@ export default function ContactPage() {
   // LISTA / KÁRTYA NÉZET: ha nincs id a paraméterekben (/contact)
   return (
     <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
-      <Topbar searchValue={query} onSearchChange={setQuery} onCreate={handleCreateContact} />
+      <Topbar searchValue={query} onSearchChange={setQuery} onCreate={hasPermission("PARTNERS_CREATE") ? handleCreateContact : undefined} />
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-y border-[#e3e8e6] bg-white px-5 py-3 lg:px-7">
         <div className="flex items-center gap-2">
@@ -118,13 +120,13 @@ export default function ContactPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs">Rendezés</span>
-          <button
+          {hasPermission("PARTNERS_CREATE") && <button
             type="button"
             onClick={() => setSortDirection((value) => (value === "desc" ? "asc" : "desc"))}
             className={`${lightButton} min-w-[130px]`}
           >
             {sortDirection === "desc" ? "Legújabb elöl" : "Legrégebbi elöl"}
-          </button>
+          </button>}
 
           <ContactExportMenu
             query={query}
@@ -189,6 +191,8 @@ export default function ContactPage() {
           reloadKey={listReloadKey}
           onView={handleViewContact}
           onEdit={handleEditContact}
+          canEdit={hasPermission("PARTNERS_EDIT")}
+          canDelete={hasPermission("PARTNERS_DELETE")}
         />
       </div>
 

@@ -3,6 +3,7 @@ import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
 
 import apiClient from "../../api/apiClient.js";
+import { useToast } from "../../hooks/useToast.js";
 
 const cellClass = "h-[58px] border-r border-b border-[#e1e6e4] px-4 text-xs text-[#344247] last:border-r-0";
 const headerClass = "h-12 border-r border-b border-[#dbe1df] px-4 text-left text-[11px] font-medium text-[#445156] last:border-r-0";
@@ -30,7 +31,8 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("hu-HU", { timeZone: "UTC" }).format(new Date(value));
 }
 
-export default function TaskListComponent({ query = "", statusFilter = "ALL", priorityFilter = "ALL", projectFilter = "", assigneeFilter = "", sortDirection = "desc", reloadKey = 0, onEdit }) {
+export default function TaskListComponent({ query = "", statusFilter = "ALL", priorityFilter = "ALL", projectFilter = "", assigneeFilter = "", sortDirection = "desc", reloadKey = 0, onEdit, canEdit = false, canDelete = false }) {
+  const { showSuccess } = useToast();
   const [result, setResult] = useState({ tasks: [], resolvedKey: null, error: "" });
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -76,6 +78,7 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
       await apiClient.delete(`/tasks/${task.id}`);
       setResult((current) => ({ ...current, tasks: current.tasks.filter(({ id }) => id !== task.id), error: "" }));
       setSelected((current) => current.filter((id) => id !== task.id));
+      showSuccess("A feladat sikeresen törölve.");
     } catch (error) {
       setResult((current) => ({ ...current, error: error.message || "A feladat törlése sikertelen." }));
     } finally { setDeletingId(null); }
@@ -98,7 +101,7 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
 
   const nameTemplate = (task) => (
     <div>
-      <button
+      {canEdit ? <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -107,7 +110,7 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
         className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium text-[#263338] hover:underline"
       >
         {task.title}
-      </button>
+      </button> : <span className="font-medium text-[#263338]">{task.title}</span>}
       {task.description && <p className="mt-0.5 max-w-72 truncate text-[11px] text-[#84908e]">{task.description}</p>}
     </div>
   );
@@ -122,7 +125,7 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <button
+      {canEdit && <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -133,8 +136,8 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
         className={actionButtonClass}
       >
         <i className="pi pi-pencil pointer-events-none" aria-hidden="true" />
-      </button>
-      <button
+      </button>}
+      {canDelete && <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -146,7 +149,7 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
         className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}
       >
         <i className={`pi ${deletingId === task.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`} aria-hidden="true" />
-      </button>
+      </button>}
     </div>
   );
 

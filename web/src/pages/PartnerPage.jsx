@@ -9,6 +9,7 @@ import PartnerShowComponent from "../components/partner/PartnerShowComponent.jsx
 import PartnerContactsComponent from "../components/partner/PartnerContactsComponent.jsx";
 import PartnerActivityComponent from "../components/partner/PartnerActivityComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
+import { useAuth } from "../hooks/useAuth.js";
 
 const iconPaths = {
   filter: <path d="M4 6h16M7 12h10m-7 6h4" />,
@@ -45,6 +46,7 @@ function getStoredViewMode() {
 }
 
 export default function PartnerPage() {
+  const { hasPermission } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -118,9 +120,9 @@ export default function PartnerPage() {
             <TabPanel header="Kapcsolattartók">
               <PartnerContactsComponent key={id} partnerId={id} />
             </TabPanel>
-            <TabPanel header="Tevékenységek">
+            {hasPermission("ACTIVITY_VIEW") && <TabPanel header="Tevékenységek">
               <PartnerActivityComponent key={id} partnerId={id} />
-            </TabPanel>
+            </TabPanel>}
           </TabView>
         </div>
       </div>
@@ -130,7 +132,7 @@ export default function PartnerPage() {
   // LISTA / KÁRTYA NÉZET: ha nincs id a paraméterekben (/partner)
   return (
     <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
-      <Topbar searchValue={query} onSearchChange={setQuery} onCreate={handleCreatePartner} />
+      <Topbar searchValue={query} onSearchChange={setQuery} onCreate={hasPermission("PARTNERS_CREATE") ? handleCreatePartner : undefined} />
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-y border-[#e3e8e6] bg-white px-5 py-3 lg:px-7">
         <div className="flex items-center gap-2">
@@ -158,7 +160,7 @@ export default function PartnerPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs">Rendezés</span>
-          <button
+          {hasPermission("PARTNERS_CREATE") && <button
             type="button"
             onClick={() => setSortDirection((value) => (value === "desc" ? "asc" : "desc"))}
             className={`${lightButton} min-w-[125px] justify-between`}
@@ -168,7 +170,7 @@ export default function PartnerPage() {
               name="chevron"
               className={`size-3.5 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`}
             />
-          </button>
+          </button>}
 
           <PartnerExportMenu
             query={query}
@@ -233,6 +235,8 @@ export default function PartnerPage() {
           reloadKey={listReloadKey}
           onView={handleViewPartner}
           onEdit={handleEditPartner}
+          canEdit={hasPermission("PARTNERS_EDIT")}
+          canDelete={hasPermission("PARTNERS_DELETE")}
         />
       </div>
 

@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [accessToken, setAccessToken] = useState(getAccessToken);
   const [user, setUser] = useState(null);
   const [modules, setModules] = useState([]);
+  const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export const AuthProvider = ({ children }) => {
       setAccessToken(null);
       setUser(null);
       setModules([]);
+      setPermissions([]);
     };
     const handleStorage = (event) => {
       if (event.key === "accessToken") {
@@ -30,6 +32,7 @@ export const AuthProvider = ({ children }) => {
         if (!event.newValue) {
           setUser(null);
           setModules([]);
+          setPermissions([]);
         }
       }
     };
@@ -58,6 +61,7 @@ export const AuthProvider = ({ children }) => {
         if (active) {
           setUser(session.user);
           setModules(session.modules || []);
+          setPermissions(session.permissions || []);
         }
       } catch {
         clearAccessToken();
@@ -77,6 +81,7 @@ export const AuthProvider = ({ children }) => {
     storeAccessToken(result.accessToken);
     setUser(result.user);
     setModules(result.modules || []);
+    setPermissions(result.permissions || []);
     return result.user;
   };
 
@@ -85,6 +90,7 @@ export const AuthProvider = ({ children }) => {
     storeAccessToken(result.accessToken);
     setUser(result.user);
     setModules(result.modules || []);
+    setPermissions(result.permissions || []);
     return result.user;
   };
 
@@ -116,6 +122,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const hasModule = useCallback((moduleKey) => modules.includes(moduleKey), [modules]);
+  const hasPermission = useCallback((permissionKey) => permissions.includes(permissionKey), [permissions]);
 
   return (
     <AuthContext.Provider
@@ -123,7 +130,9 @@ export const AuthProvider = ({ children }) => {
         accessToken,
         user,
         modules,
+        permissions,
         hasModule,
+        hasPermission,
         loading,
         isAuthenticated: Boolean(user && accessToken),
         login,

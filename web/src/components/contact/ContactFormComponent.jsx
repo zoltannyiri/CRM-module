@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import apiClient from "../../api/apiClient.js";
+import { useToast } from "../../hooks/useToast.js";
 
 const emptyForm = {
   partnerId: "",
@@ -16,6 +17,7 @@ const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 
 export default function ContactFormComponent({ mode = "create", contact, defaultPartnerId, onClose, onSaved }) {
+  const { showSuccess } = useToast();
   const [formData, setFormData] = useState(() => contact ? {
     partnerId: String(contact.partnerId),
     firstName: contact.firstName || "",
@@ -90,6 +92,7 @@ export default function ContactFormComponent({ mode = "create", contact, default
         ? await apiClient.patch(`/contacts/${contact.id}`, payload)
         : await apiClient.post("/contacts", payload);
       onSaved?.(response.data);
+      showSuccess(isEditing ? "A kapcsolattartó adatai sikeresen módosultak." : "A kapcsolattartó sikeresen létrejött.");
       onClose();
     } catch (requestError) {
       setError(requestError.message || "A kapcsolattartó mentése sikertelen.");

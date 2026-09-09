@@ -2,6 +2,7 @@ import prisma from "../lib/prisma.js";
 import authService, { toPublicUser } from "../services/authService.js";
 import invitationService from "../services/invitationService.js";
 import { getEnabledModules } from "../services/organizationModuleService.js";
+import { getEffectivePermissions } from "../services/permissionService.js";
 
 const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const configuredSameSite = process.env.REFRESH_COOKIE_SAME_SITE?.toLowerCase();
@@ -90,12 +91,14 @@ export const me = async (req, res) => {
     }
 
     const modules = await getEnabledModules(req.organization.id);
+    const permissions = await getEffectivePermissions(req.membership);
     return res.json({
       user: toPublicUser(user, {
         ...req.membership,
         organization: req.organization,
       }),
       modules,
+      permissions,
     });
   } catch (error) {
     return res.status(500).json({

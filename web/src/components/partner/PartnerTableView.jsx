@@ -79,7 +79,7 @@ export default function PartnerTableView({
       >
         <i className="pi pi-eye pointer-events-none" aria-hidden="true" />
       </button>
-      <button
+      {onEdit && <button
         type="button"
         onClick={(event) => {
           event.stopPropagation();
@@ -90,8 +90,8 @@ export default function PartnerTableView({
         className={actionButtonClass}
       >
         <i className="pi pi-pencil pointer-events-none" aria-hidden="true" />
-      </button>
-      <button
+      </button>}
+      {onDelete && <button
         type="button"
         onClick={(event) => {
           event.stopPropagation();
@@ -106,7 +106,7 @@ export default function PartnerTableView({
           className={`pi ${deletingId === partner.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`}
           aria-hidden="true"
         />
-      </button>
+      </button>}
     </div>
   );
 
@@ -114,7 +114,7 @@ export default function PartnerTableView({
     <div className="relative overflow-x-auto rounded-2xl border border-[#dbe1df] bg-white" aria-busy={loading}>
       {loading && (
         <div
-          className="absolute inset-x-0 top-12 bottom-0 z-10 grid place-items-center bg-white/80 backdrop-blur-[1px]"
+          className="absolute inset-x-0 top-12 bottom-0 z-10 grid place-items-center bg-white"
           role="status"
           aria-label="Partnerlista betöltése"
         >

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import apiClient from "../../api/apiClient.js";
+import { useToast } from "../../hooks/useToast.js";
 
 const emptyForm = {
   type: "COMPANY",
@@ -17,6 +18,7 @@ const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 
 export default function PartnerFormComponent({ mode = "create", partner, onClose, onSaved }) {
+  const { showSuccess } = useToast();
   const [formData, setFormData] = useState(() => partner
     ? Object.fromEntries(Object.keys(emptyForm).map((key) => [key, partner[key] ?? emptyForm[key]]))
     : emptyForm);
@@ -61,6 +63,7 @@ export default function PartnerFormComponent({ mode = "create", partner, onClose
         ? await apiClient.patch(`/partners/${partner.id}`, payload)
         : await apiClient.post("/partners", payload);
       onSaved?.(response.data);
+      showSuccess(isEditing ? "A partner adatai sikeresen módosultak." : "A partner sikeresen létrejött.");
       onClose();
     } catch (requestError) {
       setError(requestError.message || "A partner mentése sikertelen.");

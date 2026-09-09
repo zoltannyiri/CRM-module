@@ -6,6 +6,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { PermissionKey } from "@prisma/client";
 import prisma from "../src/lib/prisma.js";
 
 // Opt-in: executes real SQL in DATABASE_URL, rolling back every test row.
@@ -50,6 +51,7 @@ test("auth and tenant authorization HTTP integration", {
   const { default: projectRoutes } = await import("../src/routes/projectRoutes.js");
   const { default: taskRoutes } = await import("../src/routes/taskRoutes.js");
   const { default: activityRoutes } = await import("../src/routes/activityRoutes.js");
+  const { default: memberRoutes } = await import("../src/routes/memberRoutes.js");
   const { default: requireModule } = await import("../src/middleware/requireModule.js");
   const { generateAccessToken, hashRefreshToken, hashInviteToken } = await import("../src/utils/token.js");
   const app = express();
@@ -60,6 +62,7 @@ test("auth and tenant authorization HTTP integration", {
   app.use("/api/projects", projectRoutes);
   app.use("/api/tasks", taskRoutes);
   app.use("/api/activities", activityRoutes);
+  app.use("/api/members", memberRoutes);
   app.use((error, _req, res, _next) => res.status(500).json({ message: error.message }));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -109,14 +112,20 @@ test("auth and tenant authorization HTTP integration", {
         ["PARTNERS", "PROJECTS", "TASKS"].map((module) => ({ organizationId, module, enabled: true })),
       ) });
       const users = {};
+      const memberships = {};
       for (const role of ["OWNER", "ADMIN", "USER", "NONE"]) {
         users[role] = await tx.user.create({ data: {
           email: `${role.toLowerCase()}-${suffix}@example.invalid`, passwordHash, firstName: "Test", lastName: role,
         } });
-        if (role !== "NONE") await tx.organizationMember.create({ data: {
+        if (role !== "NONE") memberships[role] = await tx.organizationMember.create({ data: {
           userId: users[role].id, organizationId: org.id, role,
         } });
       }
+      await tx.organizationMemberPermission.createMany({
+        data: ["ADMIN", "USER"].flatMap((role) => Object.values(PermissionKey).map((permission) => ({
+          organizationMemberId: memberships[role].id, permission,
+        }))),
+      });
       // A later membership must not change which organization login and /me use.
       await tx.organizationMember.create({ data: {
         userId: users.OWNER.id, organizationId: otherOrg.id, role: "USER",
@@ -130,6 +139,7 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(login.body.user.organizationId, org.id);
         assert.equal(login.body.user.organization.slug, org.slug);
         assert.deepEqual(login.body.modules, ["PARTNERS", "PROJECTS", "TASKS"]);
+        assert.deepEqual(new Set(login.body.permissions), new Set(Object.values(PermissionKey)));
         assert.equal(login.body.user.passwordHash, undefined);
         assert.equal(login.body.refreshToken, undefined);
         assert.match(login.cookie, /HttpOnly/i);
@@ -142,6 +152,7 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(me.status, 200);
         assert.deepEqual(me.body.user, login.body.user);
         assert.deepEqual(me.body.modules, login.body.modules);
+        assert.deepEqual(new Set(me.body.permissions), new Set(Object.values(PermissionKey)));
         assert.equal((await request("/api/auth/login", { method: "POST", body: { email: users.OWNER.email, password: "wrong" } })).status, 401);
       });
 
@@ -159,6 +170,7 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(disabledProject.status, 403);
         assert.deepEqual(disabledProject.body, {
           message: "Ez a modul nincs engedélyezve a szervezet számára.",
+          code: "MODULE_DISABLED",
           module: "PROJECTS",
         });
         assert.equal((await request("/api/partners", { token: ownerToken })).status, 200);
@@ -194,6 +206,54 @@ test("auth and tenant authorization HTTP integration", {
 
         const me = await request("/api/auth/me", { token: ownerToken });
         assert.deepEqual(me.body.modules, ["PARTNERS", "PROJECTS", "TASKS"]);
+      });
+
+      await t.test("permission middleware, OWNER bypass and TASKS_ASSIGN are enforced", async () => {
+        const userToken = generateAccessToken(users.USER);
+        await tx.organizationMemberPermission.deleteMany({ where: { organizationMemberId: memberships.USER.id } });
+        await tx.organizationMemberPermission.createMany({ data: ["PARTNERS_VIEW", "TASKS_EDIT"].map((permission) => ({ organizationMemberId: memberships.USER.id, permission })) });
+
+        assert.equal((await request("/api/partners", { token: userToken })).status, 200);
+        for (const [method, path, body] of [["POST", "/api/partners", { name: "Denied" }], ["PATCH", "/api/partners/1", { name: "Denied" }], ["DELETE", "/api/partners/1"]]) {
+          const denied = await request(path, { method, token: userToken, body });
+          assert.equal(denied.status, 403);
+          assert.equal(denied.body.code, "PERMISSION_DENIED");
+        }
+        assert.equal((await request("/api/projects", { token: userToken })).status, 403);
+        assert.equal((await request("/api/tasks", { token: userToken })).status, 403);
+        assert.equal((await request("/api/activities", { token: userToken })).status, 403);
+
+        const task = await tx.task.create({ data: { organizationId: org.id, title: "Permission test" } });
+        assert.equal((await request(`/api/tasks/${task.id}`, { method: "PATCH", token: userToken, body: { title: "Allowed edit" } })).status, 200);
+        const assignDenied = await request(`/api/tasks/${task.id}`, { method: "PATCH", token: userToken, body: { assigneeMemberId: memberships.ADMIN.id } });
+        assert.equal(assignDenied.status, 403);
+        assert.equal(assignDenied.body.permission, "TASKS_ASSIGN");
+        assert.equal((await request("/api/activities", { token: ownerToken })).status, 200);
+
+        await tx.organizationMemberPermission.createMany({
+          data: Object.values(PermissionKey).map((permission) => ({ organizationMemberId: memberships.USER.id, permission })),
+          skipDuplicates: true,
+        });
+      });
+
+      await t.test("permission administration replaces sets and prevents privilege escalation", async () => {
+        const adminToken = generateAccessToken(users.ADMIN);
+        const ownerUpdate = await request(`/api/members/${memberships.USER.id}/permissions`, { method: "PATCH", token: ownerToken, body: { permissions: ["PARTNERS_VIEW"] } });
+        assert.equal(ownerUpdate.status, 200);
+        assert.deepEqual(ownerUpdate.body.permissions, ["PARTNERS_VIEW"]);
+        assert.deepEqual((await request(`/api/members/${memberships.USER.id}/permissions`, { token: ownerToken })).body.permissions, ["PARTNERS_VIEW"]);
+
+        await tx.organizationMemberPermission.deleteMany({ where: { organizationMemberId: memberships.ADMIN.id } });
+        await tx.organizationMemberPermission.create({ data: { organizationMemberId: memberships.ADMIN.id, permission: "PARTNERS_VIEW" } });
+        assert.equal((await request(`/api/members/${memberships.USER.id}/permissions`, { method: "PATCH", token: adminToken, body: { permissions: ["PARTNERS_VIEW"] } })).status, 200);
+        assert.equal((await request(`/api/members/${memberships.USER.id}/permissions`, { method: "PATCH", token: adminToken, body: { permissions: ["PROJECTS_VIEW"] } })).status, 403);
+        assert.equal((await request(`/api/members/${memberships.ADMIN.id}/permissions`, { method: "PATCH", token: adminToken, body: { permissions: [] } })).status, 403);
+        assert.equal((await request(`/api/members/${memberships.OWNER.id}/permissions`, { method: "PATCH", token: adminToken, body: { permissions: [] } })).status, 403);
+        assert.equal((await request(`/api/members/${memberships.OWNER.id}/permissions`, { method: "PATCH", token: ownerToken, body: { permissions: [] } })).status, 403);
+        const foreignMembership = await tx.organizationMember.findFirst({ where: { organizationId: otherOrg.id } });
+        assert.equal((await request(`/api/members/${foreignMembership.id}/permissions`, { token: ownerToken })).status, 404);
+
+        await tx.organizationMemberPermission.createMany({ data: [memberships.ADMIN.id, memberships.USER.id].flatMap((organizationMemberId) => Object.values(PermissionKey).map((permission) => ({ organizationMemberId, permission }))), skipDuplicates: true });
       });
 
       let invitationToken;
@@ -412,10 +472,12 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal(registered.body.user.organizationId, org.id);
         assert.equal(registered.body.user.organization.slug, org.slug);
         assert.deepEqual(registered.body.modules, ["PARTNERS", "PROJECTS", "TASKS"]);
+        assert.deepEqual(new Set(registered.body.permissions), new Set(Object.values(PermissionKey)));
         checkToken(registered.body.accessToken, registered.body.user.id);
         const user = await tx.user.findUnique({ where: { id: registered.body.user.id }, include: { memberships: true } });
         assert.equal(user.memberships.length, 1);
         assert.equal(user.memberships[0].role, "USER");
+        assert.equal(await tx.organizationMemberPermission.count({ where: { organizationMemberId: user.memberships[0].id } }), Object.values(PermissionKey).length);
         assert.ok(await bcrypt.compare(password, user.passwordHash));
         assert.equal((await request(`/api/auth/register/${invitationToken}`, { method: "POST", body: { ...body, email: `reuse-${suffix}@example.invalid` } })).status, 400);
         assert.equal((await request(`/api/auth/invitation/${invitationToken}`)).status, 400);

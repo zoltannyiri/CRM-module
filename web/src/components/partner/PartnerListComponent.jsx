@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import apiClient from "../../api/apiClient.js";
 import PartnerTableView from "./PartnerTableView.jsx";
 import PartnerCardView from "./PartnerCardView.jsx";
+import { useToast } from "../../hooks/useToast.js";
 
 const iconPaths = {
   left: <path d="m15 18-6-6 6-6" />,
@@ -42,7 +43,10 @@ export default function PartnerListComponent({
   viewMode: controlledViewMode,
   onView,
   onEdit,
+  canEdit = false,
+  canDelete = false,
 }) {
+  const { showSuccess } = useToast();
   const [partners, setPartners] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -97,6 +101,7 @@ export default function PartnerListComponent({
       await apiClient.delete(`/partners/${partner.id}`);
       setPartners((current) => current.filter(({ id }) => id !== partner.id));
       setSelected((current) => current.filter((id) => id !== partner.id));
+      showSuccess("A partner sikeresen törölve.");
     } catch (error) {
       setLoadError(error.message || "A partner törlése sikertelen.");
     } finally {
@@ -162,8 +167,8 @@ export default function PartnerListComponent({
           onToggleSelect={toggleSelect}
           onToggleAll={toggleAll}
           onView={onView}
-          onEdit={onEdit}
-          onDelete={handleDelete}
+          onEdit={canEdit ? onEdit : undefined}
+          onDelete={canDelete ? handleDelete : undefined}
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}
@@ -176,8 +181,8 @@ export default function PartnerListComponent({
           onToggleSelect={toggleSelect}
           onToggleAll={toggleAll}
           onView={onView}
-          onEdit={onEdit}
-          onDelete={handleDelete}
+          onEdit={canEdit ? onEdit : undefined}
+          onDelete={canDelete ? handleDelete : undefined}
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}

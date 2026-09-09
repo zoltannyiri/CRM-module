@@ -3,6 +3,10 @@ import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import { getDefaultMembership } from "./organizationService.js";
 import { getEnabledModules } from "./organizationModuleService.js";
+import {
+  getEffectivePermissions,
+  initializeMemberPermissions,
+} from "./permissionService.js";
 
 import {
   generateAccessToken,
@@ -68,6 +72,7 @@ export const toPublicUser = (user, membership) => ({
   lastName: user.lastName,
 
   role: membership?.role ?? null,
+  organizationMemberId: membership?.id ?? null,
   organizationId: membership?.organizationId ?? null,
 
   organization: membership?.organization
@@ -146,6 +151,7 @@ const registerUser = async ({
         organization: true,
       },
     });
+    await initializeMemberPermissions(membership.id, membership.role, transaction);
 
     return { user: createdUser, membership };
   });
@@ -155,6 +161,7 @@ const registerUser = async ({
     refreshToken: await createSession(user),
     user: toPublicUser(user, membership),
     modules: await getEnabledModules(membership.organizationId),
+    permissions: await getEffectivePermissions(membership),
   };
 };
 
@@ -190,6 +197,7 @@ const loginUser = async ({ email, password }) => {
     refreshToken: await createSession(user),
     user: toPublicUser(user, membership),
     modules: membership ? await getEnabledModules(membership.organizationId) : [],
+    permissions: membership ? await getEffectivePermissions(membership) : [],
   };
 };
 

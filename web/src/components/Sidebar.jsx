@@ -24,12 +24,12 @@ function Icon({ name, className = "", size = "size-[19px]" }) {
 const navigation = [
   { id: "dashboard", label: "Áttekintés" },
   { id: "pipeline", label: "Értékesítés", children: ["Folyamatok", "Lehetőségek"] },
-  { id: "contacts", label: "Partnerek", module: "PARTNERS", children: ["Összes partner", "Kapcsolattartók"] },
-  { id: "projects", label: "Projektek", module: "PROJECTS", route: "/project" },
+  { id: "contacts", label: "Partnerek", module: "PARTNERS", permission: "PARTNERS_VIEW", children: ["Összes partner", "Kapcsolattartók"] },
+  { id: "projects", label: "Projektek", module: "PROJECTS", permission: "PROJECTS_VIEW", route: "/project" },
   { id: "products", label: "Termékek", children: ["Összes termék", "Kategóriák"] },
   { id: "messages", label: "Üzenetek" },
   { id: "activities", label: "Tevékenységek", children: ["Tevékenységek", "Feladatok", "Naptár"] },
-  { id: "settings", label: "Beállítások" },
+  { id: "settings", label: "Beállítások", adminOnly: true, route: "/settings/permissions" },
   { id: "help", label: "Súgó és támogatás" },
 ];
 
@@ -44,11 +44,12 @@ const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/project")) return "projects";
   if (pathname.startsWith("/activity")) return "activities-0";
   if (pathname.startsWith("/task")) return "activities-1";
+  if (pathname.startsWith("/settings")) return "settings";
   return "dashboard";
 };
 
 export default function Sidebar() {
-  const { user, hasModule } = useAuth();
+  const { user, hasModule, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 640px)").matches);
@@ -91,7 +92,11 @@ export default function Sidebar() {
 
       <nav id="sidebar-navigation" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-[22px] [scrollbar-width:thin]" aria-label="Fő navigáció">
         <ul className="m-0 grid list-none gap-[5px] p-0">
-          {navigation.filter((item) => !item.module || hasModule(item.module)).map((item) => {
+          {navigation.filter((item) =>
+            (!item.module || hasModule(item.module)) &&
+            (!item.permission || hasPermission(item.permission)) &&
+            (!item.adminOnly || user?.role === "OWNER" || user?.role === "ADMIN")
+          ).map((item) => {
             const expanded = !collapsed && expandedGroup === item.id;
             const selected = activeItem === item.id || activeItem.startsWith(`${item.id}-`);
             return (
@@ -104,7 +109,8 @@ export default function Sidebar() {
                 {item.children && (
                   <ul id={`sidebar-${item.id}`} className="mt-[5px] mb-[7px] ml-[22px] list-none border-l border-[#e4e9e6] pl-[17px]" hidden={!expanded}>
                     {item.children.map((label, index) => {
-                      if (item.id === "activities" && index === 1 && !hasModule("TASKS")) return null;
+                      if (item.id === "activities" && index === 0 && !hasPermission("ACTIVITY_VIEW")) return null;
+                      if (item.id === "activities" && index === 1 && (!hasModule("TASKS") || !hasPermission("TASKS_VIEW"))) return null;
                       const id = `${item.id}-${index}`;
                       return <li key={id}><button type="button" className={`w-full cursor-pointer rounded-[5px] border-0 px-2.5 py-[9px] text-left text-xs ${activeItem === id ? "bg-[#eff6ee] font-semibold text-[#3c7547]" : "bg-transparent text-[#77817e] hover:bg-[#f7f8f8] hover:text-[#202e33]"}`} aria-pressed={activeItem === id} onClick={() => selectChild(item, index)}>{label}</button></li>;
                     })}

@@ -1,4 +1,8 @@
 import prisma from "../lib/prisma.js";
+import {
+  getMemberPermissions,
+  setMemberPermissions,
+} from "./permissionService.js";
 
 async function getMembers({ organizationId }) {
   return prisma.organizationMember.findMany({
@@ -12,4 +16,4 @@ async function getMembers({ organizationId }) {
   });
 }
 
-export default { getMembers };
+export default { getMembers, getMemberPermissions, setMemberPermissions };

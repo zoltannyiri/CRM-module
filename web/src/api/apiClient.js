@@ -1,4 +1,5 @@
 import axios from "axios";
+import { notifyApiError } from "../services/notificationService.js";
 
 const env = import.meta.env || {};
 const configuredBaseUrl = env.VITE_API_BASE_URL || env.VITE_API_URL || "http://localhost:5000";
@@ -95,6 +96,7 @@ apiClient.interceptors.response.use(
     const isAuthRequest = authPaths.some((path) => originalRequest?.url?.includes(path));
 
     if (error.response?.status !== 401 || !originalRequest || originalRequest._retry || isAuthRequest) {
+      if (!originalRequest?.skipGlobalErrorToast) notifyApiError(error);
       throw withApiMessage(error);
     }
 
@@ -106,6 +108,7 @@ apiClient.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${accessToken}`;
       return apiClient(originalRequest);
     } catch (refreshError) {
+      if (!originalRequest.skipGlobalErrorToast) notifyApiError(refreshError);
       throw withApiMessage(refreshError);
     }
   },

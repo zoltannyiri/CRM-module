@@ -16,7 +16,8 @@ const lightControl = "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-w
 export default function ProjectPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasModule } = useAuth();
+  const { hasModule, hasPermission } = useAuth();
+  const canUsePartners = hasModule("PARTNERS") && hasPermission("PARTNERS_VIEW");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [partnerFilter, setPartnerFilter] = useState("");
@@ -28,13 +29,13 @@ export default function ProjectPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (id) return undefined;
+    if (id || !canUsePartners) return undefined;
     let active = true;
     apiClient.get("/partners").then(({ data }) => {
       if (active) setPartners(data);
     }).catch(() => {});
     return () => { active = false; };
-  }, [id]);
+  }, [id, canUsePartners]);
 
   const openCreate = () => {
     setActiveProject(null);
@@ -66,14 +67,14 @@ export default function ProjectPage() {
             <TabPanel header="Alapadatok">
               <ProjectShowComponent projectId={id} />
             </TabPanel>
-            {hasModule("TASKS") && (
+            {hasModule("TASKS") && hasPermission("TASKS_VIEW") && (
               <TabPanel header="Feladatok">
                 <ProjectTasksComponent projectId={id} />
               </TabPanel>
             )}
-            <TabPanel header="Tevékenységek">
+            {hasPermission("ACTIVITY_VIEW") && <TabPanel header="Tevékenységek">
               <ProjectActivityComponent projectId={id} />
-            </TabPanel>
+            </TabPanel>}
           </TabView>
         </div>
       </div>
@@ -82,7 +83,7 @@ export default function ProjectPage() {
 
   return (
     <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
-      <Topbar searchValue={query} onSearchChange={setQuery} onCreate={openCreate} />
+      <Topbar searchValue={query} onSearchChange={setQuery} onCreate={hasPermission("PROJECTS_CREATE") ? openCreate : undefined} />
       <div className="flex flex-wrap items-center justify-between gap-3 border-y border-[#e3e8e6] bg-white px-5 py-3 lg:px-7">
         <div className="flex flex-wrap items-center gap-2">
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Projektstátusz" className={`${lightControl} min-w-[150px]`}>
@@ -93,19 +94,19 @@ export default function ProjectPage() {
             <option value="COMPLETED">Befejezve</option>
             <option value="CANCELLED">Megszakítva</option>
           </select>
-          <select value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} aria-label="Projektpartnerek" className={`${lightControl} min-w-[170px]`}>
+          {canUsePartners && <select value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)} aria-label="Projektpartnerek" className={`${lightControl} min-w-[170px]`}>
             <option value="">Minden partner</option>
             {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
-          </select>
+          </select>}
         </div>
         <div className="flex items-center gap-2">
           <span className="mr-1 text-xs">Rendezés</span>
           <button type="button" onClick={() => setSortDirection((value) => value === "desc" ? "asc" : "desc")} className={`${lightControl} inline-flex min-w-[125px] items-center justify-between gap-3`}>Létrehozás <i className={`pi pi-chevron-down text-[10px] transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`} aria-hidden="true" /></button>
-          <button type="button" onClick={openCreate} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]">Új projekt <i className="pi pi-chevron-down text-[10px]" aria-hidden="true" /></button>
+          {hasPermission("PROJECTS_CREATE") && <button type="button" onClick={openCreate} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]">Új projekt <i className="pi pi-chevron-down text-[10px]" aria-hidden="true" /></button>}
         </div>
       </div>
       <div className="px-5 py-5">
-        <ProjectListComponent query={query} statusFilter={statusFilter} partnerFilter={partnerFilter} sortDirection={sortDirection} reloadKey={reloadKey} onView={(project) => navigate(`/project/${project.id}`)} onEdit={openEdit} />
+        <ProjectListComponent query={query} statusFilter={statusFilter} partnerFilter={partnerFilter} sortDirection={sortDirection} reloadKey={reloadKey} onView={(project) => navigate(`/project/${project.id}`)} onEdit={openEdit} canEdit={hasPermission("PROJECTS_EDIT")} canDelete={hasPermission("PROJECTS_DELETE")} />
       </div>
       {formOpen && <ProjectFormComponent mode={formMode} project={activeProject} onClose={() => setFormOpen(false)} onSaved={() => setReloadKey((value) => value + 1)} />}
     </div>

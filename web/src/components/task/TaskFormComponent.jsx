@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import apiClient from "../../api/apiClient.js";
+import { useToast } from "../../hooks/useToast.js";
+import { useAuth } from "../../hooks/useAuth.js";
 
 const emptyForm = {
   title: "",
@@ -18,7 +20,10 @@ function dateInputValue(value) {
   return value ? String(value).slice(0, 10) : "";
 }
 
-export default function TaskFormComponent({ mode = "create", task, defaultProjectId, onClose, onSaved }) {
+export default function TaskFormComponent({ mode = "create", task, defaultProjectId, canAssign = false, onClose, onSaved }) {
+  const { showSuccess } = useToast();
+  const { hasModule, hasPermission } = useAuth();
+  const canUseProjects = Boolean(defaultProjectId) || (hasModule("PROJECTS") && hasPermission("PROJECTS_VIEW"));
   const [formData, setFormData] = useState(() => {
     if (task) {
       return {
@@ -35,7 +40,7 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
   });
   const [projects, setProjects] = useState([]);
   const [members, setMembers] = useState([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsLoading, setProjectsLoading] = useState(canUseProjects);
   const [membersLoading, setMembersLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +58,7 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
   }, [onClose]);
 
   useEffect(() => {
+    if (!canUseProjects) return undefined;
     let active = true;
     apiClient.get("/projects")
       .then(({ data }) => {
@@ -65,7 +71,7 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
         if (active) setProjectsLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [canUseProjects]);
 
   useEffect(() => {
     let active = true;
@@ -93,8 +99,8 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
     setError("");
     const payload = {
       title: formData.title.trim(),
-      projectId: formData.projectId ? Number(formData.projectId) : null,
-      assigneeMemberId: formData.assigneeMemberId ? Number(formData.assigneeMemberId) : null,
+      ...(canUseProjects ? { projectId: formData.projectId ? Number(formData.projectId) : null } : {}),
+      ...(canAssign ? { assigneeMemberId: formData.assigneeMemberId ? Number(formData.assigneeMemberId) : null } : {}),
       status: formData.status,
       priority: formData.priority,
       dueDate: formData.dueDate || null,
@@ -106,6 +112,7 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
         ? await apiClient.patch(`/tasks/${task.id}`, payload)
         : await apiClient.post("/tasks", payload);
       onSaved?.(response.data);
+      showSuccess(isEditing ? "A feladat adatai sikeresen módosultak." : "A feladat sikeresen létrejött.");
       onClose();
     } catch (requestError) {
       setError(requestError.message || "A feladat mentése sikertelen.");
@@ -136,18 +143,18 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
                 <label className={`${labelClass} sm:col-span-2`}>Feladat neve
                   <input name="title" value={formData.title} onChange={handleChange} className={fieldClass} placeholder="Feladat neve" required autoFocus />
                 </label>
-                <label className={labelClass}>Projekt
+                {canUseProjects && <label className={labelClass}>Projekt
                   <select name="projectId" value={formData.projectId} onChange={handleChange} disabled={projectsLoading || (defaultProjectId && !isEditing)} className={`${fieldClass} disabled:cursor-wait disabled:bg-[#f5f7f6]`}>
                     <option value="">{projectsLoading ? "Projektek betöltése…" : "Nincs projekt hozzárendelve"}</option>
                     {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
                   </select>
-                </label>
-                <label className={labelClass}>Felelős
+                </label>}
+                {canAssign && <label className={labelClass}>Felelős
                   <select name="assigneeMemberId" value={formData.assigneeMemberId} onChange={handleChange} disabled={membersLoading} className={`${fieldClass} disabled:cursor-wait disabled:bg-[#f5f7f6]`}>
                     <option value="">{membersLoading ? "Felelősök betöltése…" : "Nincs felelős"}</option>
                     {members.map((member) => <option key={member.id} value={member.id}>{member.user?.firstName} {member.user?.lastName}</option>)}
                   </select>
-                </label>
+                </label>}
                 <label className={labelClass}>Státusz
                   <select name="status" value={formData.status} onChange={handleChange} className={fieldClass}>
                     <option value="TODO">Teendő</option>
@@ -180,7 +187,7 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
 
         <footer className="flex justify-end gap-3 border-t border-[#dfe5e3] bg-white px-7 py-4">
           <button type="button" onClick={onClose} className="h-10 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-5 text-xs font-medium text-[#455358] hover:bg-[#f5f7f6]">Mégse</button>
-          <button type="submit" form="task-form" disabled={submitting || projectsLoading || membersLoading} className="h-10 cursor-pointer rounded-md border border-[#1e3338] bg-[#263b40] px-6 text-xs font-semibold text-white hover:bg-[#1c3035] disabled:cursor-wait disabled:opacity-60">{submitting ? "Mentés…" : isEditing ? "Módosítások mentése" : "Feladat létrehozása"}</button>
+          <button type="submit" form="task-form" disabled={submitting || (canUseProjects && projectsLoading) || membersLoading} className="h-10 cursor-pointer rounded-md border border-[#1e3338] bg-[#263b40] px-6 text-xs font-semibold text-white hover:bg-[#1c3035] disabled:cursor-wait disabled:opacity-60">{submitting ? "Mentés…" : isEditing ? "Módosítások mentése" : "Feladat létrehozása"}</button>
         </footer>
       </aside>
     </div>
