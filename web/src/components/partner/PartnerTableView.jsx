@@ -14,10 +14,15 @@ export default function PartnerTableView({
   onView,
   onEdit,
   onDelete,
+  canView = true,
+  canEdit = false,
+  canDelete = false,
   deletingId = null,
   loading = false,
   loadError = "",
 }) {
+  const hasActions = canEdit || canDelete;
+
   const checkboxTemplate = (partner) => {
     const checked = selected.includes(partner.id);
     return (
@@ -45,16 +50,20 @@ export default function PartnerTableView({
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f1f4f3] text-[11px] font-medium text-[#465458]">
           {initials}
         </span>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onView?.(partner);
-          }}
-          className="cursor-pointer border-0 bg-transparent p-0 text-left text-xs font-medium text-[#263338] hover:underline"
-        >
-          {partner.name}
-        </button>
+        {canView && onView ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onView(partner);
+            }}
+            className="cursor-pointer border-0 bg-transparent p-0 text-left text-xs font-medium text-[#263338] hover:underline"
+          >
+            {partner.name}
+          </button>
+        ) : (
+          <span className="text-xs font-medium text-[#263338]">{partner.name}</span>
+        )}
       </div>
     );
   };
@@ -67,46 +76,52 @@ export default function PartnerTableView({
       onPointerDown={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
     >
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onView?.(partner);
-        }}
-        aria-label={`${partner.name} megtekintése`}
-        title="Megtekintés"
-        className={actionButtonClass}
-      >
-        <i className="pi pi-eye pointer-events-none" aria-hidden="true" />
-      </button>
-      {onEdit && <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onEdit?.(partner);
-        }}
-        aria-label={`${partner.name} módosítása`}
-        title="Módosítás"
-        className={actionButtonClass}
-      >
-        <i className="pi pi-pencil pointer-events-none" aria-hidden="true" />
-      </button>}
-      {onDelete && <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onDelete?.(partner);
-        }}
-        disabled={deletingId === partner.id}
-        aria-label={`${partner.name} törlése`}
-        title="Törlés"
-        className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}
-      >
-        <i
-          className={`pi ${deletingId === partner.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`}
-          aria-hidden="true"
-        />
-      </button>}
+      {canView && onView && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onView(partner);
+          }}
+          aria-label={`${partner.name} megtekintése`}
+          title="Megtekintés"
+          className={actionButtonClass}
+        >
+          <i className="pi pi-eye pointer-events-none" aria-hidden="true" />
+        </button>
+      )}
+      {canEdit && onEdit && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit(partner);
+          }}
+          aria-label={`${partner.name} módosítása`}
+          title="Módosítás"
+          className={actionButtonClass}
+        >
+          <i className="pi pi-pencil pointer-events-none" aria-hidden="true" />
+        </button>
+      )}
+      {canDelete && onDelete && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(partner);
+          }}
+          disabled={deletingId === partner.id}
+          aria-label={`${partner.name} törlése`}
+          title="Törlés"
+          className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}
+        >
+          <i
+            className={`pi ${deletingId === partner.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`}
+            aria-hidden="true"
+          />
+        </button>
+      )}
     </div>
   );
 
@@ -128,7 +143,7 @@ export default function PartnerTableView({
         unstyled
         tableClassName="w-full min-w-[1100px] border-collapse text-left"
         rowClassName={(partner) => `${selected.includes(partner.id) ? "bg-[#f5faf5]" : "bg-white"} hover:bg-[#fafcfc]`}
-        onRowDoubleClick={(event) => onView?.(event.data)}
+        onRowDoubleClick={(event) => canView && onView?.(event.data)}
         emptyMessage={
           <span className="block h-40 pt-16 text-center text-xs text-[#778286]">
             {loadError || "Nincs megjeleníthető partner."}
@@ -198,12 +213,14 @@ export default function PartnerTableView({
           headerClassName={`${headerClass} w-[21%]`}
           bodyClassName={`${cellClass} w-[21%]`}
         />
-        <Column
-          header="Műveletek"
-          body={actionTemplate}
-          headerClassName={`${headerClass} w-[130px] !px-2 text-center`}
-          bodyClassName={`${cellClass} w-[130px] !px-2`}
-        />
+        {hasActions && (
+          <Column
+            header="Műveletek"
+            body={actionTemplate}
+            headerClassName={`${headerClass} w-[130px] !px-2 text-center`}
+            bodyClassName={`${cellClass} w-[130px] !px-2`}
+          />
+        )}
       </DataTable>
     </div>
   );

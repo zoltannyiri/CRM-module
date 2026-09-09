@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import apiClient from "../../api/apiClient.js";
+import { useAuth } from "../../hooks/useAuth.js";
 import { useToast } from "../../hooks/useToast.js";
 
 const emptyForm = {
@@ -17,7 +18,18 @@ const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 
 export default function ContactFormComponent({ mode = "create", contact, defaultPartnerId, onClose, onSaved }) {
+  const { hasPermission } = useAuth();
   const { showSuccess } = useToast();
+  const canCreate = hasPermission("PARTNERS_CREATE");
+  const canEdit = hasPermission("PARTNERS_EDIT");
+  const canView = hasPermission("PARTNERS_VIEW");
+
+  const isEditing = mode === "edit";
+  const isViewing = mode === "view";
+
+  const isAuthorized = isViewing ? canView : isEditing ? canEdit : canCreate;
+  if (!isAuthorized) return null;
+
   const [formData, setFormData] = useState(() => contact ? {
     partnerId: String(contact.partnerId),
     firstName: contact.firstName || "",
@@ -31,8 +43,6 @@ export default function ContactFormComponent({ mode = "create", contact, default
   const [partnersLoading, setPartnersLoading] = useState(() => !(defaultPartnerId && contact?.partner));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const isEditing = mode === "edit";
-  const isViewing = mode === "view";
   const partnerLocked = Boolean(defaultPartnerId);
 
   useEffect(() => {

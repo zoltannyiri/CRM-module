@@ -23,6 +23,13 @@ function dateInputValue(value) {
 export default function ProjectFormComponent({ mode = "create", project, onClose, onSaved }) {
   const { showSuccess } = useToast();
   const { hasModule, hasPermission } = useAuth();
+  const canCreate = hasPermission("PROJECTS_CREATE");
+  const canEdit = hasPermission("PROJECTS_EDIT");
+  const isEditing = mode === "edit";
+
+  const isAuthorized = isEditing ? canEdit : canCreate;
+  if (!isAuthorized) return null;
+
   const canUsePartners = hasModule("PARTNERS") && hasPermission("PARTNERS_VIEW");
   const [formData, setFormData] = useState(() => project ? {
     name: project.name || "",
@@ -36,7 +43,6 @@ export default function ProjectFormComponent({ mode = "create", project, onClose
   const [partnersLoading, setPartnersLoading] = useState(canUsePartners);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const isEditing = mode === "edit";
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;

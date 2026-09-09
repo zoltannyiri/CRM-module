@@ -92,11 +92,17 @@ export default function Sidebar() {
 
       <nav id="sidebar-navigation" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-[22px] [scrollbar-width:thin]" aria-label="Fő navigáció">
         <ul className="m-0 grid list-none gap-[5px] p-0">
-          {navigation.filter((item) =>
-            (!item.module || hasModule(item.module)) &&
-            (!item.permission || hasPermission(item.permission)) &&
-            (!item.adminOnly || user?.role === "OWNER" || user?.role === "ADMIN")
-          ).map((item) => {
+          {navigation.filter((item) => {
+            if (item.module && !hasModule(item.module)) return false;
+            if (item.permission && !hasPermission(item.permission)) return false;
+            if (item.adminOnly && user?.role !== "OWNER" && user?.role !== "ADMIN") return false;
+            if (item.id === "activities") {
+              const canViewActivity = hasPermission("ACTIVITY_VIEW");
+              const canViewTasks = hasModule("TASKS") && hasPermission("TASKS_VIEW");
+              if (!canViewActivity && !canViewTasks) return false;
+            }
+            return true;
+          }).map((item) => {
             const expanded = !collapsed && expandedGroup === item.id;
             const selected = activeItem === item.id || activeItem.startsWith(`${item.id}-`);
             return (
@@ -111,6 +117,7 @@ export default function Sidebar() {
                     {item.children.map((label, index) => {
                       if (item.id === "activities" && index === 0 && !hasPermission("ACTIVITY_VIEW")) return null;
                       if (item.id === "activities" && index === 1 && (!hasModule("TASKS") || !hasPermission("TASKS_VIEW"))) return null;
+                      if (item.id === "activities" && index === 2 && !hasPermission("ACTIVITY_VIEW")) return null;
                       const id = `${item.id}-${index}`;
                       return <li key={id}><button type="button" className={`w-full cursor-pointer rounded-[5px] border-0 px-2.5 py-[9px] text-left text-xs ${activeItem === id ? "bg-[#eff6ee] font-semibold text-[#3c7547]" : "bg-transparent text-[#77817e] hover:bg-[#f7f8f8] hover:text-[#202e33]"}`} aria-pressed={activeItem === id} onClick={() => selectChild(item, index)}>{label}</button></li>;
                     })}

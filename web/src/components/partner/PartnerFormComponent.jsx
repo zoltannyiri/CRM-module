@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import apiClient from "../../api/apiClient.js";
 import { useToast } from "../../hooks/useToast.js";
+import { useAuth } from "../../hooks/useAuth.js";
 
 const emptyForm = {
   type: "COMPANY",
@@ -18,6 +19,15 @@ const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 
 export default function PartnerFormComponent({ mode = "create", partner, onClose, onSaved }) {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("PARTNERS_CREATE");
+  const canEdit = hasPermission("PARTNERS_EDIT");
+  const canView = hasPermission("PARTNERS_VIEW");
+
+  if (mode === "create" && !canCreate) return null;
+  if (mode === "edit" && !canEdit) return null;
+  if (mode === "view" && !canView) return null;
+
   const { showSuccess } = useToast();
   const [formData, setFormData] = useState(() => partner
     ? Object.fromEntries(Object.keys(emptyForm).map((key) => [key, partner[key] ?? emptyForm[key]]))

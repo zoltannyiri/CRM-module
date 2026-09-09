@@ -31,8 +31,9 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("hu-HU", { timeZone: "UTC" }).format(new Date(value));
 }
 
-export default function TaskListComponent({ query = "", statusFilter = "ALL", priorityFilter = "ALL", projectFilter = "", assigneeFilter = "", sortDirection = "desc", reloadKey = 0, onEdit, canEdit = false, canDelete = false }) {
-  const { showSuccess } = useToast();
+export default function TaskListComponent({ query = "", statusFilter = "ALL", priorityFilter = "ALL", projectFilter = "", assigneeFilter = "", sortDirection = "desc", reloadKey = 0, onEdit, canView = true, canEdit = false, canDelete = false }) {
+  const { showSuccess, showError } = useToast();
+  const hasActions = canEdit || canDelete;
   const [result, setResult] = useState({ tasks: [], resolvedKey: null, error: "" });
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -72,6 +73,10 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
   const toggleTask = (id) => setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
 
   const handleDelete = async (task) => {
+    if (!canDelete) {
+      showError("Nincs jogosultsága a feladat törléséhez.", "Nincs jogosultság");
+      return;
+    }
     if (!window.confirm(`Biztosan törölni szeretnéd ezt a feladatot: ${task.title}?`)) return;
     setDeletingId(task.id);
     try {
@@ -167,7 +172,7 @@ export default function TaskListComponent({ query = "", statusFilter = "ALL", pr
           <Column header="Státusz" body={statusTemplate} headerClassName={`${headerClass} w-[10%]`} bodyClassName={`${cellClass} w-[10%]`} />
           <Column header="Prioritás" body={priorityTemplate} headerClassName={`${headerClass} w-[10%]`} bodyClassName={`${cellClass} w-[10%]`} />
           <Column header="Határidő" body={(task) => formatDate(task.dueDate)} headerClassName={`${headerClass} w-[10%]`} bodyClassName={`${cellClass} w-[10%] whitespace-nowrap`} />
-          <Column header="Műveletek" body={actionTemplate} headerClassName={`${headerClass} w-[104px] !px-2 text-center`} bodyClassName={`${cellClass} w-[104px] !px-2`} />
+          {hasActions && <Column header="Műveletek" body={actionTemplate} headerClassName={`${headerClass} w-[104px] !px-2 text-center`} bodyClassName={`${cellClass} w-[104px] !px-2`} />}
         </DataTable>
       </div>
       <nav className="mt-5 flex justify-center" aria-label="Feladatlista lapozása"><div className="inline-flex overflow-hidden rounded-md border border-[#d6dddc] bg-white"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => value - 1)} className="h-9 cursor-pointer border-0 border-r border-[#dfe4e3] bg-white px-3 text-xs hover:bg-[#f7f8f8] disabled:cursor-not-allowed disabled:opacity-40">Előző</button>{Array.from({ length: pageCount }, (_, index) => index + 1).map((number) => <button key={number} type="button" onClick={() => setPage(number)} aria-current={number === currentPage ? "page" : undefined} className={`size-9 cursor-pointer border-0 border-r border-[#dfe4e3] text-xs ${number === currentPage ? "bg-[#f0f3f2] font-semibold" : "bg-white hover:bg-[#f7f8f8]"}`}>{number}</button>)}<button type="button" disabled={currentPage === pageCount} onClick={() => setPage((value) => value + 1)} className="h-9 cursor-pointer border-0 bg-white px-3 text-xs hover:bg-[#f7f8f8] disabled:cursor-not-allowed disabled:opacity-40">Következő</button></div></nav>

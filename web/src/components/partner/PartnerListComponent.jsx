@@ -45,8 +45,9 @@ export default function PartnerListComponent({
   onEdit,
   canEdit = false,
   canDelete = false,
+  canView = true,
 }) {
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const [partners, setPartners] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -93,6 +94,10 @@ export default function PartnerListComponent({
   }
 
   const handleDelete = async (partner) => {
+    if (!canDelete) {
+      showError("Nincs jogosultsága a partner törléséhez.", "Nincs jogosultság");
+      return;
+    }
     if (!window.confirm(`Biztosan törölni szeretnéd ezt a partnert: ${partner.name}?`)) return;
 
     setDeletingId(partner.id);
@@ -169,6 +174,9 @@ export default function PartnerListComponent({
           onView={onView}
           onEdit={canEdit ? onEdit : undefined}
           onDelete={canDelete ? handleDelete : undefined}
+          canView={canView}
+          canEdit={canEdit}
+          canDelete={canDelete}
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}
@@ -183,6 +191,9 @@ export default function PartnerListComponent({
           onView={onView}
           onEdit={canEdit ? onEdit : undefined}
           onDelete={canDelete ? handleDelete : undefined}
+          canView={canView}
+          canEdit={canEdit}
+          canDelete={canDelete}
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}

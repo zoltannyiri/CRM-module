@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import apiClient from "../../api/apiClient.js";
 import ActivityFeed from "../activity/ActivityFeed.jsx";
+import { useAuth } from "../../hooks/useAuth.js";
 
 export default function ProjectActivityComponent({ projectId }) {
+  const { hasPermission } = useAuth();
+  const canView = hasPermission("ACTIVITY_VIEW");
+
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!canView) return undefined;
     let active = true;
     setLoading(true);
     setError("");
@@ -38,7 +43,9 @@ export default function ProjectActivityComponent({ projectId }) {
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [canView, projectId]);
+
+  if (!canView) return null;
 
   return (
     <section aria-labelledby="project-activities-title">

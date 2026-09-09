@@ -43,10 +43,11 @@ export default function ContactListComponent({
   viewMode: controlledViewMode,
   onView,
   onEdit,
+  canView = true,
   canEdit = false,
   canDelete = false,
 }) {
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
@@ -113,6 +114,10 @@ export default function ContactListComponent({
   };
 
   const handleDelete = async (contact) => {
+    if (!canDelete) {
+      showError("Nincs jogosultsága a kapcsolattartó törléséhez.", "Nincs jogosultság");
+      return;
+    }
     const fullName = `${contact.firstName} ${contact.lastName}`;
     if (!window.confirm(`Biztosan törölni szeretnéd ezt a kapcsolattartót: ${fullName}?`)) return;
 
@@ -172,6 +177,9 @@ export default function ContactListComponent({
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}
+          canView={canView}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       ) : (
         <ContactCardView
@@ -186,6 +194,9 @@ export default function ContactListComponent({
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}
+          canView={canView}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       )}
 

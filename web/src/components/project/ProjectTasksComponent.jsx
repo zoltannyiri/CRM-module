@@ -30,11 +30,12 @@ function formatDate(value) {
 
 export default function ProjectTasksComponent({ projectId }) {
   const { hasPermission } = useAuth();
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const canCreate = hasPermission("TASKS_CREATE");
   const canEdit = hasPermission("TASKS_EDIT");
   const canDelete = hasPermission("TASKS_DELETE");
   const canAssign = hasPermission("TASKS_ASSIGN");
+  const hasActions = canEdit || canDelete;
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -71,12 +72,20 @@ export default function ProjectTasksComponent({ projectId }) {
   };
 
   const openCreate = () => {
+    if (!canCreate) {
+      showError("Nincs jogosultsága új feladat létrehozásához.", "Nincs jogosultság");
+      return;
+    }
     setActiveTask(null);
     setFormMode("create");
     setFormOpen(true);
   };
 
   const openEdit = (task) => {
+    if (!canEdit) {
+      showError("Nincs jogosultsága a feladat módosításához.", "Nincs jogosultság");
+      return;
+    }
     setActiveTask(task);
     setFormMode("edit");
     setFormOpen(true);
@@ -88,6 +97,10 @@ export default function ProjectTasksComponent({ projectId }) {
   };
 
   const handleDelete = async (task) => {
+    if (!canDelete) {
+      showError("Nincs jogosultsága a feladat törléséhez.", "Nincs jogosultság");
+      return;
+    }
     if (!window.confirm(`Biztosan törölni szeretnéd ezt a feladatot: ${task.title}?`)) return;
 
     setDeletingId(task.id);
@@ -117,13 +130,13 @@ export default function ProjectTasksComponent({ projectId }) {
       </div>
 
       <div className="relative overflow-hidden rounded-xl border border-[#dbe1df] bg-white" aria-busy={loading}>
-        <div className="hidden grid-cols-[minmax(150px,1.5fr)_90px_90px_minmax(110px,.9fr)_100px_108px] border-b border-[#dbe1df] bg-[#fafbfb] px-4 text-[11px] font-medium text-[#657276] md:grid">
+        <div className={`hidden ${hasActions ? "grid-cols-[minmax(150px,1.5fr)_90px_90px_minmax(110px,.9fr)_100px_108px]" : "grid-cols-[minmax(150px,1.5fr)_90px_90px_minmax(110px,.9fr)_100px]"} border-b border-[#dbe1df] bg-[#fafbfb] px-4 text-[11px] font-medium text-[#657276] md:grid`}>
           <span className="py-3">Feladat</span>
           <span className="py-3">Státusz</span>
           <span className="py-3">Prioritás</span>
           <span className="py-3">Felelős</span>
           <span className="py-3">Határidő</span>
-          <span className="py-3 text-center">Műveletek</span>
+          {hasActions && <span className="py-3 text-center">Műveletek</span>}
         </div>
 
         {loading ? (
@@ -149,16 +162,18 @@ export default function ProjectTasksComponent({ projectId }) {
           <div className="divide-y divide-[#e4e9e7]">
             {tasks.map((task) => {
               return (
-                <div key={task.id} className="grid gap-2 px-4 py-3.5 text-xs text-[#344247] transition-colors hover:bg-[#fafcfc] md:grid-cols-[minmax(150px,1.5fr)_90px_90px_minmax(110px,.9fr)_100px_108px] md:items-center md:gap-0">
+                <div key={task.id} className={`grid gap-2 px-4 py-3.5 text-xs text-[#344247] transition-colors hover:bg-[#fafcfc] ${hasActions ? "md:grid-cols-[minmax(150px,1.5fr)_90px_90px_minmax(110px,.9fr)_100px_108px]" : "md:grid-cols-[minmax(150px,1.5fr)_90px_90px_minmax(110px,.9fr)_100px]"} md:items-center md:gap-0`}>
                   {canEdit ? <button type="button" onClick={() => openEdit(task)} className="cursor-pointer border-0 bg-transparent p-0 text-left font-semibold text-[#263338] hover:underline truncate mr-2">{task.title}</button> : <span className="truncate mr-2 font-semibold text-[#263338]">{task.title}</span>}
                   <span><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium ${statusClasses[task.status]}`}>{statusLabels[task.status]}</span></span>
                   <span><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span></span>
                   <span className="truncate mr-2">{task.assigneeMember?.user ? `${task.assigneeMember.user.firstName} ${task.assigneeMember.user.lastName}` : "—"}</span>
                   <span className="whitespace-nowrap">{formatDate(task.dueDate)}</span>
-                  <div className="flex items-center gap-1 md:justify-center">
-                    {canEdit && <button type="button" onClick={() => openEdit(task)} aria-label={`${task.title} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil pointer-events-none" aria-hidden="true" /></button>}
-                    {canDelete && <button type="button" onClick={() => handleDelete(task)} disabled={deletingId === task.id} aria-label={`${task.title} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === task.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`} aria-hidden="true" /></button>}
-                  </div>
+                  {hasActions && (
+                    <div className="flex items-center gap-1 md:justify-center">
+                      {canEdit && <button type="button" onClick={() => openEdit(task)} aria-label={`${task.title} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil pointer-events-none" aria-hidden="true" /></button>}
+                      {canDelete && <button type="button" onClick={() => handleDelete(task)} disabled={deletingId === task.id} aria-label={`${task.title} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === task.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`} aria-hidden="true" /></button>}
+                    </div>
+                  )}
                 </div>
               );
             })}

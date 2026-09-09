@@ -10,6 +10,7 @@ import ProjectTasksComponent from "../components/project/ProjectTasksComponent.j
 import ProjectActivityComponent from "../components/project/ProjectActivityComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
+import { useToast } from "../hooks/useToast.js";
 
 const lightControl = "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] outline-none shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
 
@@ -17,6 +18,7 @@ export default function ProjectPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasModule, hasPermission } = useAuth();
+  const { showError } = useToast();
   const canUsePartners = hasModule("PARTNERS") && hasPermission("PARTNERS_VIEW");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -38,14 +40,29 @@ export default function ProjectPage() {
   }, [id, canUsePartners]);
 
   const openCreate = () => {
+    if (!hasPermission("PROJECTS_CREATE")) {
+      showError("Nincs jogosultsága új projekt létrehozásához.", "Nincs jogosultság");
+      return;
+    }
     setActiveProject(null);
     setFormMode("create");
     setFormOpen(true);
   };
   const openEdit = (project) => {
+    if (!hasPermission("PROJECTS_EDIT")) {
+      showError("Nincs jogosultsága a projekt módosításához.", "Nincs jogosultság");
+      return;
+    }
     setActiveProject(project);
     setFormMode("edit");
     setFormOpen(true);
+  };
+  const handleView = (project) => {
+    if (!hasPermission("PROJECTS_VIEW")) {
+      showError("Nincs jogosultsága a projekt megtekintéséhez.", "Nincs jogosultság");
+      return;
+    }
+    navigate(`/project/${project.id}`);
   };
 
   if (id) {
@@ -106,7 +123,7 @@ export default function ProjectPage() {
         </div>
       </div>
       <div className="px-5 py-5">
-        <ProjectListComponent query={query} statusFilter={statusFilter} partnerFilter={partnerFilter} sortDirection={sortDirection} reloadKey={reloadKey} onView={(project) => navigate(`/project/${project.id}`)} onEdit={openEdit} canEdit={hasPermission("PROJECTS_EDIT")} canDelete={hasPermission("PROJECTS_DELETE")} />
+        <ProjectListComponent query={query} statusFilter={statusFilter} partnerFilter={partnerFilter} sortDirection={sortDirection} reloadKey={reloadKey} onView={handleView} onEdit={openEdit} canView={hasPermission("PROJECTS_VIEW")} canEdit={hasPermission("PROJECTS_EDIT")} canDelete={hasPermission("PROJECTS_DELETE")} />
       </div>
       {formOpen && <ProjectFormComponent mode={formMode} project={activeProject} onClose={() => setFormOpen(false)} onSaved={() => setReloadKey((value) => value + 1)} />}
     </div>

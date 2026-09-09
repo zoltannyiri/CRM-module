@@ -10,7 +10,11 @@ export default function ContactCardView({
   deletingId = null,
   loading = false,
   loadError = "",
+  canView = true,
+  canEdit = false,
+  canDelete = false,
 }) {
+  const hasActions = canEdit || canDelete;
   const [openMenuId, setOpenMenuId] = useState(null);
   const menuContainerRef = useRef(null);
 
@@ -62,8 +66,10 @@ export default function ContactCardView({
         return (
           <article
             key={contact.id}
-            onClick={() => onView?.(contact)}
-            className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border bg-white p-5 transition duration-150 ease-out hover:border-[#bcc8c5] hover:shadow-[0_4px_16px_rgba(24,39,43,0.05)] ${
+            onClick={() => canView && onView?.(contact)}
+            className={`group relative flex ${
+              canView ? "cursor-pointer" : "cursor-default"
+            } flex-col justify-between rounded-xl border bg-white p-5 transition duration-150 ease-out hover:border-[#bcc8c5] hover:shadow-[0_4px_16px_rgba(24,39,43,0.05)] ${
               isSelected ? "border-[#78ad7d] bg-[#f9fbf9] ring-1 ring-[#78ad7d]/30" : "border-[#dbe1df]"
             }`}
           >
@@ -99,73 +105,81 @@ export default function ContactCardView({
               </div>
 
               {/* 3 pontos műveleti gomb */}
-              <div
-                ref={openMenuId === contact.id ? menuContainerRef : null}
-                className="relative shrink-0"
-                onClick={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenMenuId((current) => (current === contact.id ? null : contact.id))}
-                  aria-label={`${fullName} műveletek`}
-                  title="Műveletek"
-                  className="grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[#748084] transition hover:bg-[#f1f4f3] hover:text-[#253238]"
+              {hasActions && (
+                <div
+                  ref={openMenuId === contact.id ? menuContainerRef : null}
+                  className="relative shrink-0"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => event.stopPropagation()}
                 >
-                  <i className="pi pi-ellipsis-v pointer-events-none text-xs" aria-hidden="true" />
-                </button>
-
-                {openMenuId === contact.id && (
-                  <div
-                    role="menu"
-                    className="absolute right-0 top-full z-30 mt-1 w-36 rounded-lg border border-[#d9e0de] bg-white py-1 shadow-[0_8px_24px_rgba(28,45,48,.12)] text-xs"
+                  <button
+                    type="button"
+                    onClick={() => setOpenMenuId((current) => (current === contact.id ? null : contact.id))}
+                    aria-label={`${fullName} műveletek`}
+                    title="Műveletek"
+                    className="grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[#748084] transition hover:bg-[#f1f4f3] hover:text-[#253238]"
                   >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuId(null);
-                        onView?.(contact);
-                      }}
-                      className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#344247] hover:bg-[#f2f5f4]"
+                    <i className="pi pi-ellipsis-v pointer-events-none text-xs" aria-hidden="true" />
+                  </button>
+
+                  {openMenuId === contact.id && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-full z-30 mt-1 w-36 rounded-lg border border-[#d9e0de] bg-white py-1 shadow-[0_8px_24px_rgba(28,45,48,.12)] text-xs"
                     >
-                      <i className="pi pi-eye pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
-                      <span>Megtekintés</span>
-                    </button>
-                    {onEdit && <button
-                      type="button"
-                      role="menuitem"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuId(null);
-                        onEdit?.(contact);
-                      }}
-                      className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#344247] hover:bg-[#f2f5f4]"
-                    >
-                      <i className="pi pi-pencil pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
-                      <span>Módosítás</span>
-                    </button>}
-                    {onDelete && <button
-                      type="button"
-                      role="menuitem"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuId(null);
-                        onDelete?.(contact);
-                      }}
-                      disabled={deletingId === contact.id}
-                      className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#a34b3d] hover:bg-[#fdf1ee] disabled:cursor-wait disabled:opacity-50"
-                    >
-                      <i
-                        className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none text-xs`}
-                        aria-hidden="true"
-                      />
-                      <span>Törlés</span>
-                    </button>}
-                  </div>
-                )}
-              </div>
+                      {canView && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId(null);
+                            onView?.(contact);
+                          }}
+                          className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#344247] hover:bg-[#f2f5f4]"
+                        >
+                          <i className="pi pi-eye pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
+                          <span>Megtekintés</span>
+                        </button>
+                      )}
+                      {canEdit && onEdit && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId(null);
+                            onEdit?.(contact);
+                          }}
+                          className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#344247] hover:bg-[#f2f5f4]"
+                        >
+                          <i className="pi pi-pencil pointer-events-none text-xs text-[#627b68]" aria-hidden="true" />
+                          <span>Módosítás</span>
+                        </button>
+                      )}
+                      {canDelete && onDelete && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId(null);
+                            onDelete?.(contact);
+                          }}
+                          disabled={deletingId === contact.id}
+                          className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[#a34b3d] hover:bg-[#fdf1ee] disabled:cursor-wait disabled:opacity-50"
+                        >
+                          <i
+                            className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none text-xs`}
+                            aria-hidden="true"
+                          />
+                          <span>Törlés</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Kártyatest: Partner szervezet, Email és Telefon, Megjegyzés */}

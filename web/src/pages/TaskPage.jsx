@@ -4,11 +4,13 @@ import TaskFormComponent from "../components/task/TaskFormComponent.jsx";
 import TaskListComponent from "../components/task/TaskListComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
+import { useToast } from "../hooks/useToast.js";
 
 const lightControl = "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] outline-none shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
 
 export default function TaskPage() {
   const { hasModule, hasPermission } = useAuth();
+  const { showError } = useToast();
   const canUseProjects = hasModule("PROJECTS") && hasPermission("PROJECTS_VIEW");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -41,11 +43,19 @@ export default function TaskPage() {
   }, []);
 
   const openCreate = () => {
+    if (!hasPermission("TASKS_CREATE")) {
+      showError("Nincs jogosultsága új feladat létrehozásához.", "Nincs jogosultság");
+      return;
+    }
     setActiveTask(null);
     setFormMode("create");
     setFormOpen(true);
   };
   const openEdit = (task) => {
+    if (!hasPermission("TASKS_EDIT")) {
+      showError("Nincs jogosultsága a feladat módosításához.", "Nincs jogosultság");
+      return;
+    }
     setActiveTask(task);
     setFormMode("edit");
     setFormOpen(true);
@@ -87,7 +97,7 @@ export default function TaskPage() {
         </div>
       </div>
       <div className="px-5 py-5">
-        <TaskListComponent query={query} statusFilter={statusFilter} priorityFilter={priorityFilter} projectFilter={projectFilter} assigneeFilter={assigneeFilter} sortDirection={sortDirection} reloadKey={reloadKey} onEdit={openEdit} canEdit={hasPermission("TASKS_EDIT")} canDelete={hasPermission("TASKS_DELETE")} />
+        <TaskListComponent query={query} statusFilter={statusFilter} priorityFilter={priorityFilter} projectFilter={projectFilter} assigneeFilter={assigneeFilter} sortDirection={sortDirection} reloadKey={reloadKey} onEdit={openEdit} canView={hasPermission("TASKS_VIEW")} canEdit={hasPermission("TASKS_EDIT")} canDelete={hasPermission("TASKS_DELETE")} />
       </div>
       {formOpen && <TaskFormComponent mode={formMode} task={activeTask} canAssign={hasPermission("TASKS_ASSIGN")} onClose={() => setFormOpen(false)} onSaved={() => setReloadKey((value) => value + 1)} />}
     </div>

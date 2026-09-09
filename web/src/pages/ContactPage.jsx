@@ -8,6 +8,7 @@ import ContactListComponent from "../components/contact/ContactListComponent.jsx
 import ContactShowComponent from "../components/contact/ContactShowComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
+import { useToast } from "../hooks/useToast.js";
 
 const lightButton =
   "inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9]";
@@ -23,6 +24,7 @@ function getStoredViewMode() {
 
 export default function ContactPage() {
   const { hasPermission } = useAuth();
+  const { showError } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -47,16 +49,28 @@ export default function ContactPage() {
   };
 
   const handleCreateContact = () => {
+    if (!hasPermission("PARTNERS_CREATE")) {
+      showError("Nincs jogosultsága új kapcsolattartó létrehozásához.", "Nincs jogosultság");
+      return;
+    }
     setActiveContact(null);
     setFormMode("create");
     setFormOpen(true);
   };
 
   const handleViewContact = (contact) => {
+    if (!hasPermission("PARTNERS_VIEW")) {
+      showError("Nincs jogosultsága a kapcsolattartó megtekintéséhez.", "Nincs jogosultság");
+      return;
+    }
     navigate(`/contact/${contact.id}`);
   };
 
   const handleEditContact = (contact) => {
+    if (!hasPermission("PARTNERS_EDIT")) {
+      showError("Nincs jogosultsága a kapcsolattartó módosításához.", "Nincs jogosultság");
+      return;
+    }
     setActiveContact(contact);
     setFormMode("edit");
     setFormOpen(true);
@@ -120,13 +134,13 @@ export default function ContactPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs">Rendezés</span>
-          {hasPermission("PARTNERS_CREATE") && <button
+          <button
             type="button"
             onClick={() => setSortDirection((value) => (value === "desc" ? "asc" : "desc"))}
             className={`${lightButton} min-w-[130px]`}
           >
             {sortDirection === "desc" ? "Legújabb elöl" : "Legrégebbi elöl"}
-          </button>}
+          </button>
 
           <ContactExportMenu
             query={query}
@@ -171,14 +185,16 @@ export default function ContactPage() {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCreateContact}
-            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]"
-          >
-            <i className="pi pi-plus text-[10px]" aria-hidden="true" />
-            Új kapcsolattartó
-          </button>
+          {hasPermission("PARTNERS_CREATE") && (
+            <button
+              type="button"
+              onClick={handleCreateContact}
+              className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]"
+            >
+              <i className="pi pi-plus text-[10px]" aria-hidden="true" />
+              Új kapcsolattartó
+            </button>
+          )}
         </div>
       </div>
 
@@ -191,6 +207,7 @@ export default function ContactPage() {
           reloadKey={listReloadKey}
           onView={handleViewContact}
           onEdit={handleEditContact}
+          canView={hasPermission("PARTNERS_VIEW")}
           canEdit={hasPermission("PARTNERS_EDIT")}
           canDelete={hasPermission("PARTNERS_DELETE")}
         />

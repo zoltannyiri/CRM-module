@@ -10,6 +10,7 @@ import PartnerContactsComponent from "../components/partner/PartnerContactsCompo
 import PartnerActivityComponent from "../components/partner/PartnerActivityComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
+import { useToast } from "../hooks/useToast.js";
 
 const iconPaths = {
   filter: <path d="M4 6h16M7 12h10m-7 6h4" />,
@@ -47,6 +48,7 @@ function getStoredViewMode() {
 
 export default function PartnerPage() {
   const { hasPermission } = useAuth();
+  const { showError } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -71,16 +73,28 @@ export default function PartnerPage() {
   };
 
   const handleCreatePartner = () => {
+    if (!hasPermission("PARTNERS_CREATE")) {
+      showError("Nincs jogosultsága partner létrehozásához.", "Nincs jogosultság");
+      return;
+    }
     setActivePartner(null);
     setFormMode("create");
     setFormOpen(true);
   };
 
   const handleViewPartner = (partner) => {
+    if (!hasPermission("PARTNERS_VIEW")) {
+      showError("Nincs jogosultsága a partner megtekintéséhez.", "Nincs jogosultság");
+      return;
+    }
     navigate(`/partner/${partner.id}`);
   };
 
   const handleEditPartner = (partner) => {
+    if (!hasPermission("PARTNERS_EDIT")) {
+      showError("Nincs jogosultsága a partner módosításához.", "Nincs jogosultság");
+      return;
+    }
     setActivePartner(partner);
     setFormMode("edit");
     setFormOpen(true);
@@ -160,7 +174,7 @@ export default function PartnerPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs">Rendezés</span>
-          {hasPermission("PARTNERS_CREATE") && <button
+          <button
             type="button"
             onClick={() => setSortDirection((value) => (value === "desc" ? "asc" : "desc"))}
             className={`${lightButton} min-w-[125px] justify-between`}
@@ -170,7 +184,7 @@ export default function PartnerPage() {
               name="chevron"
               className={`size-3.5 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`}
             />
-          </button>}
+          </button>
 
           <PartnerExportMenu
             query={query}
@@ -215,14 +229,16 @@ export default function PartnerPage() {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCreatePartner}
-            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]"
-          >
-            Új partner
-            <Icon name="chevron" className="size-3.5" />
-          </button>
+          {hasPermission("PARTNERS_CREATE") && (
+            <button
+              type="button"
+              onClick={handleCreatePartner}
+              className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#172a2e] bg-[#21343a] px-4 text-xs font-semibold text-white hover:bg-[#17282d]"
+            >
+              Új partner
+              <Icon name="chevron" className="size-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,6 +253,7 @@ export default function PartnerPage() {
           onEdit={handleEditPartner}
           canEdit={hasPermission("PARTNERS_EDIT")}
           canDelete={hasPermission("PARTNERS_DELETE")}
+          canView={hasPermission("PARTNERS_VIEW")}
         />
       </div>
 

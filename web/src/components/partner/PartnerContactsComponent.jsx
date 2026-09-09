@@ -9,10 +9,12 @@ const actionButtonClass = "grid size-8 cursor-pointer place-items-center rounded
 
 export default function PartnerContactsComponent({ partnerId }) {
   const { hasPermission } = useAuth();
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
+  const canView = hasPermission("PARTNERS_VIEW");
   const canCreate = hasPermission("PARTNERS_CREATE");
   const canEdit = hasPermission("PARTNERS_EDIT");
   const canDelete = hasPermission("PARTNERS_DELETE");
+  const hasActions = canEdit || canDelete;
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,12 +51,24 @@ export default function PartnerContactsComponent({ partnerId }) {
   };
 
   const openCreate = () => {
+    if (!canCreate) {
+      showError("Nincs jogosultsága új kapcsolattartó létrehozásához.", "Nincs jogosultság");
+      return;
+    }
     setActiveContact(null);
     setFormMode("create");
     setFormOpen(true);
   };
 
   const openContact = (contact, mode) => {
+    if (mode === "edit" && !canEdit) {
+      showError("Nincs jogosultsága a kapcsolattartó módosításához.", "Nincs jogosultság");
+      return;
+    }
+    if (mode === "view" && !canView) {
+      showError("Nincs jogosultsága a kapcsolattartó megtekintéséhez.", "Nincs jogosultság");
+      return;
+    }
     setActiveContact(contact);
     setFormMode(mode);
     setFormOpen(true);
@@ -66,6 +80,10 @@ export default function PartnerContactsComponent({ partnerId }) {
   };
 
   const handleDelete = async (contact) => {
+    if (!canDelete) {
+      showError("Nincs jogosultsága a kapcsolattartó törléséhez.", "Nincs jogosultság");
+      return;
+    }
     const fullName = `${contact.firstName} ${contact.lastName}`;
     if (!window.confirm(`Biztosan törölni szeretnéd ezt a kapcsolattartót: ${fullName}?`)) return;
 
@@ -96,12 +114,12 @@ export default function PartnerContactsComponent({ partnerId }) {
       </div>
 
       <div className="relative overflow-hidden rounded-xl border border-[#dbe1df] bg-white" aria-busy={loading}>
-        <div className="hidden grid-cols-[minmax(150px,1.25fr)_minmax(110px,.8fr)_minmax(170px,1.2fr)_minmax(125px,.9fr)_108px] border-b border-[#dbe1df] bg-[#fafbfb] px-4 text-[11px] font-medium text-[#657276] md:grid">
+        <div className={`hidden ${hasActions ? "grid-cols-[minmax(150px,1.25fr)_minmax(110px,.8fr)_minmax(170px,1.2fr)_minmax(125px,.9fr)_108px]" : "grid-cols-[minmax(150px,1.25fr)_minmax(110px,.8fr)_minmax(170px,1.2fr)_minmax(125px,.9fr)]"} border-b border-[#dbe1df] bg-[#fafbfb] px-4 text-[11px] font-medium text-[#657276] md:grid`}>
           <span className="py-3">Név</span>
           <span className="py-3">Beosztás</span>
           <span className="py-3">Email</span>
           <span className="py-3">Telefon</span>
-          <span className="py-3 text-center">Műveletek</span>
+          {hasActions && <span className="py-3 text-center">Műveletek</span>}
         </div>
 
         {loading ? (
@@ -128,16 +146,22 @@ export default function PartnerContactsComponent({ partnerId }) {
             {contacts.map((contact) => {
               const fullName = `${contact.firstName} ${contact.lastName}`;
               return (
-                <div key={contact.id} className="grid gap-2 px-4 py-3.5 text-xs text-[#344247] transition-colors hover:bg-[#fafcfc] md:grid-cols-[minmax(150px,1.25fr)_minmax(110px,.8fr)_minmax(170px,1.2fr)_minmax(125px,.9fr)_108px] md:items-center md:gap-0">
-                  <button type="button" onClick={() => openContact(contact, "view")} className="cursor-pointer border-0 bg-transparent p-0 text-left font-semibold text-[#263338] hover:underline">{fullName}</button>
+                <div key={contact.id} className={`grid gap-2 px-4 py-3.5 text-xs text-[#344247] transition-colors hover:bg-[#fafcfc] ${hasActions ? "md:grid-cols-[minmax(150px,1.25fr)_minmax(110px,.8fr)_minmax(170px,1.2fr)_minmax(125px,.9fr)_108px]" : "md:grid-cols-[minmax(150px,1.25fr)_minmax(110px,.8fr)_minmax(170px,1.2fr)_minmax(125px,.9fr)]"} md:items-center md:gap-0`}>
+                  {canView ? (
+                    <button type="button" onClick={() => openContact(contact, "view")} className="cursor-pointer border-0 bg-transparent p-0 text-left font-semibold text-[#263338] hover:underline">{fullName}</button>
+                  ) : (
+                    <span className="font-semibold text-[#263338]">{fullName}</span>
+                  )}
                   <span><span className="mr-2 text-[#8a9693] md:hidden">Beosztás:</span>{contact.position || "—"}</span>
                   <span className="truncate"><span className="mr-2 text-[#8a9693] md:hidden">Email:</span>{contact.email || "—"}</span>
                   <span className="whitespace-nowrap"><span className="mr-2 text-[#8a9693] md:hidden">Telefon:</span>{contact.phone || "—"}</span>
-                  <div className="flex items-center gap-1 md:justify-center">
-                    <button type="button" onClick={() => openContact(contact, "view")} aria-label={`${fullName} megtekintése`} title="Megtekintés" className={actionButtonClass}><i className="pi pi-eye" aria-hidden="true" /></button>
-                    {canEdit && <button type="button" onClick={() => openContact(contact, "edit")} aria-label={`${fullName} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil" aria-hidden="true" /></button>}
-                    {canDelete && <button type="button" onClick={() => handleDelete(contact)} disabled={deletingId === contact.id} aria-label={`${fullName} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>}
-                  </div>
+                  {hasActions && (
+                    <div className="flex items-center gap-1 md:justify-center">
+                      {canView && <button type="button" onClick={() => openContact(contact, "view")} aria-label={`${fullName} megtekintése`} title="Megtekintés" className={actionButtonClass}><i className="pi pi-eye pointer-events-none" aria-hidden="true" /></button>}
+                      {canEdit && <button type="button" onClick={() => openContact(contact, "edit")} aria-label={`${fullName} szerkesztése`} title="Szerkesztés" className={actionButtonClass}><i className="pi pi-pencil pointer-events-none" aria-hidden="true" /></button>}
+                      {canDelete && <button type="button" onClick={() => handleDelete(contact)} disabled={deletingId === contact.id} aria-label={`${fullName} törlése`} title="Törlés" className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee] hover:text-[#8f392d]`}><i className={`pi ${deletingId === contact.id ? "pi-spinner pi-spin" : "pi-trash"} pointer-events-none`} aria-hidden="true" /></button>}
+                    </div>
+                  )}
                 </div>
               );
             })}
