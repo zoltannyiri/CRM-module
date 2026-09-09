@@ -17,18 +17,29 @@ const emptyForm = {
 const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3.5 text-sm text-[#263338] outline-none transition placeholder:text-[#a1abaa] focus:border-[#79a97e] focus:ring-2 focus:ring-[#79a97e]/15 disabled:cursor-default disabled:bg-[#f5f7f6] disabled:text-[#536166]";
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 
-export default function ContactFormComponent({ mode = "create", contact, defaultPartnerId, onClose, onSaved }) {
+export default function ContactFormComponent(props) {
   const { hasPermission } = useAuth();
-  const { showSuccess } = useToast();
-  const canCreate = hasPermission("PARTNERS_CREATE");
-  const canEdit = hasPermission("PARTNERS_EDIT");
-  const canView = hasPermission("PARTNERS_VIEW");
+  const mode = props.mode || "create";
 
+  const allowed =
+    mode === "edit"
+      ? hasPermission("PARTNERS_EDIT")
+      : mode === "view"
+        ? hasPermission("PARTNERS_VIEW")
+        : hasPermission("PARTNERS_CREATE");
+
+  if (!allowed) {
+    return null;
+  }
+
+  return <ContactForm {...props} />;
+}
+
+function ContactForm({ mode = "create", contact, defaultPartnerId, onClose, onSaved }) {
+  const { showSuccess } = useToast();
   const isEditing = mode === "edit";
   const isViewing = mode === "view";
-
-  const isAuthorized = isViewing ? canView : isEditing ? canEdit : canCreate;
-  if (!isAuthorized) return null;
+  const partnerLocked = Boolean(defaultPartnerId);
 
   const [formData, setFormData] = useState(() => contact ? {
     partnerId: String(contact.partnerId),
@@ -43,7 +54,6 @@ export default function ContactFormComponent({ mode = "create", contact, default
   const [partnersLoading, setPartnersLoading] = useState(() => !(defaultPartnerId && contact?.partner));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const partnerLocked = Boolean(defaultPartnerId);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;

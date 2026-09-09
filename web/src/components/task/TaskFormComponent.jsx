@@ -20,16 +20,28 @@ function dateInputValue(value) {
   return value ? String(value).slice(0, 10) : "";
 }
 
-export default function TaskFormComponent({ mode = "create", task, defaultProjectId, onClose, onSaved }) {
+export default function TaskFormComponent(props) {
+  const { hasPermission } = useAuth();
+  const mode = props.mode || "create";
+
+  const allowed =
+    mode === "edit"
+      ? hasPermission("TASKS_EDIT")
+      : mode === "view"
+        ? hasPermission("TASKS_VIEW")
+        : hasPermission("TASKS_CREATE");
+
+  if (!allowed) {
+    return null;
+  }
+
+  return <TaskForm {...props} />;
+}
+
+function TaskForm({ mode = "create", task, defaultProjectId, onClose, onSaved }) {
   const { showSuccess } = useToast();
   const { hasModule, hasPermission } = useAuth();
-  const canCreate = hasPermission("TASKS_CREATE");
-  const canEdit = hasPermission("TASKS_EDIT");
   const isEditing = mode === "edit";
-
-  const isAuthorized = isEditing ? canEdit : canCreate;
-  if (!isAuthorized) return null;
-
   const canAssign = hasPermission("TASKS_ASSIGN");
   const canUseProjects = Boolean(defaultProjectId) || (hasModule("PROJECTS") && hasPermission("PROJECTS_VIEW"));
   const [formData, setFormData] = useState(() => {
@@ -81,10 +93,7 @@ export default function TaskFormComponent({ mode = "create", task, defaultProjec
   }, [canUseProjects]);
 
   useEffect(() => {
-    if (!canAssign) {
-      setMembersLoading(false);
-      return undefined;
-    }
+    if (!canAssign) return undefined;
     let active = true;
     apiClient.get("/members")
       .then(({ data }) => {

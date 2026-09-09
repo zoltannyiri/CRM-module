@@ -18,16 +18,25 @@ const emptyForm = {
 const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3.5 text-sm text-[#263338] outline-none transition placeholder:text-[#a1abaa] focus:border-[#79a97e] focus:ring-2 focus:ring-[#79a97e]/15 disabled:cursor-default disabled:bg-[#f5f7f6] disabled:text-[#536166]";
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 
-export default function PartnerFormComponent({ mode = "create", partner, onClose, onSaved }) {
+export default function PartnerFormComponent(props) {
   const { hasPermission } = useAuth();
-  const canCreate = hasPermission("PARTNERS_CREATE");
-  const canEdit = hasPermission("PARTNERS_EDIT");
-  const canView = hasPermission("PARTNERS_VIEW");
+  const mode = props.mode || "create";
 
-  if (mode === "create" && !canCreate) return null;
-  if (mode === "edit" && !canEdit) return null;
-  if (mode === "view" && !canView) return null;
+  const allowed =
+    mode === "edit"
+      ? hasPermission("PARTNERS_EDIT")
+      : mode === "view"
+        ? hasPermission("PARTNERS_VIEW")
+        : hasPermission("PARTNERS_CREATE");
 
+  if (!allowed) {
+    return null;
+  }
+
+  return <PartnerForm {...props} />;
+}
+
+function PartnerForm({ mode = "create", partner, onClose, onSaved }) {
   const { showSuccess } = useToast();
   const [formData, setFormData] = useState(() => partner
     ? Object.fromEntries(Object.keys(emptyForm).map((key) => [key, partner[key] ?? emptyForm[key]]))

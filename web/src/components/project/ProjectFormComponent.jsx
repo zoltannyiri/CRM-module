@@ -20,16 +20,28 @@ function dateInputValue(value) {
   return value ? String(value).slice(0, 10) : "";
 }
 
-export default function ProjectFormComponent({ mode = "create", project, onClose, onSaved }) {
+export default function ProjectFormComponent(props) {
+  const { hasPermission } = useAuth();
+  const mode = props.mode || "create";
+
+  const allowed =
+    mode === "edit"
+      ? hasPermission("PROJECTS_EDIT")
+      : mode === "view"
+        ? hasPermission("PROJECTS_VIEW")
+        : hasPermission("PROJECTS_CREATE");
+
+  if (!allowed) {
+    return null;
+  }
+
+  return <ProjectForm {...props} />;
+}
+
+function ProjectForm({ mode = "create", project, onClose, onSaved }) {
   const { showSuccess } = useToast();
   const { hasModule, hasPermission } = useAuth();
-  const canCreate = hasPermission("PROJECTS_CREATE");
-  const canEdit = hasPermission("PROJECTS_EDIT");
   const isEditing = mode === "edit";
-
-  const isAuthorized = isEditing ? canEdit : canCreate;
-  if (!isAuthorized) return null;
-
   const canUsePartners = hasModule("PARTNERS") && hasPermission("PARTNERS_VIEW");
   const [formData, setFormData] = useState(() => project ? {
     name: project.name || "",
