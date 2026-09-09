@@ -7,6 +7,7 @@ const icons = {
   pipeline: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M9 9v11M15 9v11" /></>,
   contacts: <><circle cx="9" cy="7" r="3" /><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3" /></>,
   products: <path d="M3 7V5a2 2 0 0 1 2-2h5l3 4h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />,
+  projects: <><path d="M4 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12h20" /></>,
   messages: <><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /><path d="M7 10h.01M12 10h.01M17 10h.01" /></>,
   activities: <path d="M2 12h4l4-9 4 18 4-9h4" />,
   settings: <><path d="m9 3-1 3-3 1-2 4 2 2v3l3 2 1 3h5l1-3 3-2v-3l2-2-2-4-3-1-1-3Z" /><circle cx="11.5" cy="12" r="3" /></>,
@@ -24,6 +25,7 @@ const navigation = [
   { id: "dashboard", label: "Áttekintés" },
   { id: "pipeline", label: "Értékesítés", children: ["Folyamatok", "Lehetőségek"] },
   { id: "contacts", label: "Partnerek", children: ["Összes partner", "Kapcsolattartók"] },
+  { id: "projects", label: "Projektek", route: "/project" },
   { id: "products", label: "Termékek", children: ["Összes termék", "Kategóriák"] },
   { id: "messages", label: "Üzenetek" },
   { id: "activities", label: "Tevékenységek", children: ["Feladatok", "Naptár"] },
@@ -38,6 +40,7 @@ const childRoutes = {
 const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/contact")) return "contacts-1";
   if (pathname.startsWith("/partner")) return "contacts-0";
+  if (pathname.startsWith("/project")) return "projects";
   return "dashboard";
 };
 
@@ -55,6 +58,7 @@ export default function Sidebar() {
       setExpandedGroup((current) => current === item.id ? null : item.id);
     } else {
       setActiveItem(item.id);
+      if (item.route) navigate(item.route);
     }
   }
 

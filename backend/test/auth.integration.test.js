@@ -47,12 +47,14 @@ test("auth and tenant authorization HTTP integration", {
   const { default: authRoutes } = await import("../src/routes/authRoutes.js");
   const { default: contactRoutes } = await import("../src/routes/contactRoutes.js");
   const { default: partnerRoutes } = await import("../src/routes/partnerRoutes.js");
+  const { default: projectRoutes } = await import("../src/routes/projectRoutes.js");
   const { generateAccessToken, hashRefreshToken, hashInviteToken } = await import("../src/utils/token.js");
   const app = express();
   app.use(express.json(), cookieParser());
   app.use("/api/auth", authRoutes);
   app.use("/api/contacts", contactRoutes);
   app.use("/api/partners", partnerRoutes);
+  app.use("/api/projects", projectRoutes);
   app.use((error, _req, res, _next) => res.status(500).json({ message: error.message }));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -274,6 +276,70 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal((await request(`/api/contacts/${contactId}`, { method: "DELETE", token: ownerToken })).status, 200);
         assert.equal((await request(`/api/contacts/${contactId}`, { token: ownerToken })).status, 404);
         assert.ok(await tx.contact.findUnique({ where: { id: foreignContact.id } }));
+      });
+
+      await t.test("projects CRUD, filters and partner assignment remain tenant isolated", async () => {
+        const localPartner = await tx.partner.create({ data: { organizationId: org.id, name: "Project customer" } });
+        const foreignPartner = await tx.partner.create({ data: { organizationId: otherOrg.id, name: "Foreign project customer" } });
+        const foreignProject = await tx.project.create({ data: {
+          organizationId: otherOrg.id, partnerId: foreignPartner.id, name: "Foreign project", status: "ACTIVE",
+        } });
+
+        const created = await request("/api/projects", { method: "POST", token: ownerToken, body: {
+          name: "Local rollout", description: "CRM bevezetés", partnerId: localPartner.id,
+          status: "ACTIVE", startDate: "2026-09-10", deadline: "2026-10-15",
+          organizationId: otherOrg.id, id: foreignProject.id,
+        } });
+        assert.equal(created.status, 201, created.body.message);
+        assert.equal(created.body.organizationId, org.id);
+        assert.equal(created.body.partnerId, localPartner.id);
+        assert.equal(created.body.partner.name, localPartner.name);
+        const projectId = created.body.id;
+
+        assert.equal((await request("/api/projects")).status, 401);
+        assert.equal((await request("/api/projects", { method: "POST", token: ownerToken, body: {
+          name: "Intrusion", partnerId: foreignPartner.id,
+        } })).status, 404);
+        assert.equal((await request("/api/projects", { method: "POST", token: ownerToken, body: {
+          name: "Invalid dates", startDate: "2026-10-01", deadline: "2026-09-01",
+        } })).status, 400);
+        assert.equal((await request("/api/projects?status=UNKNOWN", { token: ownerToken })).status, 400);
+        assert.equal((await request("/api/projects?partnerId=abc", { token: ownerToken })).status, 400);
+
+        const list = await request("/api/projects?q=rollout&status=ACTIVE&sortDirection=asc", { token: ownerToken });
+        assert.equal(list.status, 200);
+        assert.deepEqual(list.body.map((project) => project.id), [projectId]);
+        const filtered = await request(`/api/projects?partnerId=${localPartner.id}`, { token: ownerToken });
+        assert.deepEqual(filtered.body.map((project) => project.id), [projectId]);
+        assert.deepEqual((await request(`/api/projects?partnerId=${foreignPartner.id}`, { token: ownerToken })).body, []);
+
+        assert.equal((await request(`/api/projects/${projectId}`, { token: ownerToken })).status, 200);
+        for (const method of ["GET", "PATCH", "DELETE"]) {
+          const response = await request(`/api/projects/${foreignProject.id}`, {
+            method, token: ownerToken, ...(method === "PATCH" && { body: { name: "Intrusion" } }),
+          });
+          assert.equal(response.status, 404, method);
+        }
+        assert.equal((await request(`/api/projects/${projectId}`, { method: "PATCH", token: ownerToken, body: {
+          partnerId: foreignPartner.id,
+        } })).status, 404);
+        assert.equal((await request(`/api/projects/${projectId}`, { method: "PATCH", token: ownerToken, body: {
+          startDate: "2026-11-01",
+        } })).status, 400);
+
+        const updated = await request(`/api/projects/${projectId}`, { method: "PATCH", token: ownerToken, body: {
+          name: "Local rollout 2", status: "ON_HOLD", partnerId: null,
+          organizationId: otherOrg.id, organization: { connect: { id: otherOrg.id } },
+        } });
+        assert.equal(updated.status, 200, updated.body.message);
+        assert.equal(updated.body.name, "Local rollout 2");
+        assert.equal(updated.body.status, "ON_HOLD");
+        assert.equal(updated.body.partnerId, null);
+        assert.equal(updated.body.organizationId, org.id);
+
+        assert.equal((await request(`/api/projects/${projectId}`, { method: "DELETE", token: ownerToken })).status, 200);
+        assert.equal((await request(`/api/projects/${projectId}`, { token: ownerToken })).status, 404);
+        assert.equal((await tx.project.findUnique({ where: { id: foreignProject.id } })).name, "Foreign project");
       });
 
       await t.test("invitation registration retains membership and is single use", async () => {

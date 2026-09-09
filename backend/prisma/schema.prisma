@@ -17,6 +17,14 @@ enum PartnerType {
   PERSON
 }
 
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
 enum ModuleKey {
   PARTNERS
 
@@ -42,6 +50,7 @@ model Organization {
 
   members     OrganizationMember[]
   partners    Partner[]
+  projects    Project[]
   invitations Invitation[]
   modules     OrganizationModule[]
 
@@ -148,6 +157,7 @@ model Partner {
   note      String?
 
   contacts Contact[]
+  projects Project[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -173,4 +183,27 @@ model Contact {
   updatedAt DateTime @updatedAt
 
   @@index([partnerId])
+}
+
+model Project {
+  id Int @id @default(autoincrement())
+
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  partnerId Int?
+  partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNED)
+  startDate   DateTime?
+  deadline    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([partnerId])
+  @@index([organizationId, status])
 }
