@@ -139,6 +139,13 @@ async function deletePartner({ organizationId, actorMemberId, partnerId }) {
     });
     if (!existing) return null;
 
+    const linkedOfferCount = await tx.offer.count({ where: { organizationId, partnerId } });
+    if (linkedOfferCount > 0) {
+      const error = new Error("A partner nem törölhető, amíg ajánlat tartozik hozzá.");
+      error.statusCode = 409;
+      throw error;
+    }
+
     await activityService.createActivity(
       {
         organizationId,

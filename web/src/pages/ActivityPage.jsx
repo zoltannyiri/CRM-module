@@ -44,6 +44,8 @@ export default function ActivityPage() {
             <option value="CONTACT">Kapcsolattartó</option>
             <option value="PROJECT">Projekt</option>
             <option value="TASK">Feladat</option>
+            <option value="DOCUMENT">Dokumentum</option>
+            <option value="OFFER">Ajánlat</option>
           </select>
 
           {/* Művelet */}

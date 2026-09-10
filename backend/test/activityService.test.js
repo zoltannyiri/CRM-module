@@ -42,6 +42,22 @@ test("getAllowedActivityEntityTypes computes allowed entity types from modules a
     []
   );
 
+  assert.deepEqual(
+    getAllowedActivityEntityTypes({
+      enabledModules: ["OFFERS"],
+      permissions: ["OFFERS_VIEW", "ACTIVITY_VIEW"],
+    }),
+    ["OFFER"]
+  );
+
+  assert.deepEqual(
+    getAllowedActivityEntityTypes({
+      enabledModules: ["OFFERS"],
+      permissions: ["ACTIVITY_VIEW"],
+    }),
+    []
+  );
+
   // No entity permissions -> empty list
   assert.deepEqual(
     getAllowedActivityEntityTypes({

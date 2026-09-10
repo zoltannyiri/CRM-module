@@ -12,6 +12,7 @@ import taskRoutes from "./routes/taskRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
+import offerRoutes from "./routes/offerRoutes.js";
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/offers", offerRoutes);
 
 app.use((error, _req, res, _next) => {
   const candidateStatus = error?.statusCode ?? error?.status;

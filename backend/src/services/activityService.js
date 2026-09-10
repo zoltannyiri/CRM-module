@@ -57,6 +57,12 @@ export function getAllowedActivityEntityTypes({ enabledModules = [], permissions
     allowed.push(ActivityEntityType.DOCUMENT);
   }
 
+  const hasOffers = (modules.has(ModuleKey.OFFERS) || modules.has("OFFERS")) &&
+    (perms.has(PermissionKey.OFFERS_VIEW) || perms.has("OFFERS_VIEW"));
+  if (hasOffers) {
+    allowed.push(ActivityEntityType.OFFER);
+  }
+
   return allowed;
 }
 

@@ -9,6 +9,7 @@ import ProjectShowComponent from "../components/project/ProjectShowComponent.jsx
 import ProjectTasksComponent from "../components/project/ProjectTasksComponent.jsx";
 import ProjectDocumentsComponent from "../components/project/ProjectDocumentsComponent.jsx";
 import ProjectActivityComponent from "../components/project/ProjectActivityComponent.jsx";
+import RelatedOffersComponent from "../components/offer/RelatedOffersComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
@@ -93,6 +94,11 @@ export default function ProjectPage() {
             {hasModule("DOCUMENTS") && hasPermission("DOCUMENTS_VIEW") && (
               <TabPanel header="Dokumentumok">
                 <ProjectDocumentsComponent key={id} projectId={id} />
+              </TabPanel>
+            )}
+            {hasModule("OFFERS") && hasPermission("OFFERS_VIEW") && (
+              <TabPanel header="Ajánlatok">
+                <RelatedOffersComponent projectId={id} />
               </TabPanel>
             )}
             {hasPermission("ACTIVITY_VIEW") && <TabPanel header="Tevékenységek">

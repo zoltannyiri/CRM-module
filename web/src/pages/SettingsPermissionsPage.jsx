@@ -8,6 +8,7 @@ const groups = [
   { title: "Partnerek", module: "PARTNERS", permissions: [["PARTNERS_VIEW", "Megtekintés"], ["PARTNERS_CREATE", "Létrehozás"], ["PARTNERS_EDIT", "Módosítás"], ["PARTNERS_DELETE", "Törlés"]] },
   { title: "Projektek", module: "PROJECTS", permissions: [["PROJECTS_VIEW", "Megtekintés"], ["PROJECTS_CREATE", "Létrehozás"], ["PROJECTS_EDIT", "Módosítás"], ["PROJECTS_DELETE", "Törlés"]] },
   { title: "Feladatok", module: "TASKS", permissions: [["TASKS_VIEW", "Megtekintés"], ["TASKS_CREATE", "Létrehozás"], ["TASKS_EDIT", "Módosítás"], ["TASKS_DELETE", "Törlés"], ["TASKS_ASSIGN", "Felelős hozzárendelése"]] },
+  { title: "Ajánlatok", module: "OFFERS", permissions: [["OFFERS_VIEW", "Megtekintés"], ["OFFERS_CREATE", "Létrehozás"], ["OFFERS_EDIT", "Módosítás"], ["OFFERS_DELETE", "Törlés"]] },
   { title: "Tevékenységek", permissions: [["ACTIVITY_VIEW", "Megtekintés"]] },
 ];
 

@@ -5,6 +5,8 @@ const entityLabels = {
   CONTACT: "Kapcsolattartó",
   PROJECT: "Projekt",
   TASK: "Feladat",
+  DOCUMENT: "Dokumentum",
+  OFFER: "Ajánlat",
 };
 
 const entityClasses = {
@@ -12,6 +14,8 @@ const entityClasses = {
   CONTACT: "border-[#d8e2e6] bg-[#f0f4f7] text-[#446574]",
   PROJECT: "border-[#d4e4da] bg-[#eef7f1] text-[#3c6b45]",
   TASK: "border-[#e0dce8] bg-[#f4f1f9] text-[#5e4b77]",
+  DOCUMENT: "border-[#d8e2e6] bg-[#f0f4f7] text-[#446574]",
+  OFFER: "border-[#e8ddc5] bg-[#faf6ec] text-[#816d40]",
 };
 
 const actionLabels = {
@@ -51,7 +55,17 @@ const valueLabels = {
   // Partner types
   COMPANY: "Cég",
   PERSON: "Magánszemély",
+  DRAFT: "Piszkozat",
+  SENT: "Elküldve",
+  ACCEPTED: "Elfogadva",
+  REJECTED: "Elutasítva",
+  EXPIRED: "Lejárt",
 };
+
+function activityValueLabel(activity, value) {
+  if (activity.entityType === "OFFER" && value === "CANCELLED") return "Visszavonva";
+  return valueLabels[value] || value || "—";
+}
 
 const fieldLabels = {
   name: "Név",
@@ -75,6 +89,10 @@ const fieldLabels = {
   firstName: "Keresztnév",
   lastName: "Vezetéknév",
   position: "Beosztás",
+  issueDate: "Kiállítás dátuma",
+  validUntil: "Érvényesség",
+  currency: "Pénznem",
+  items: "Tételsorok",
 };
 
 function formatTime(dateString) {
@@ -110,8 +128,8 @@ function renderMetadata(activity) {
   if (!metadata || typeof metadata !== "object") return null;
 
   if (action === "STATUS_CHANGED") {
-    const oldVal = valueLabels[metadata.oldValue] || metadata.oldValue || "—";
-    const newVal = valueLabels[metadata.newValue] || metadata.newValue || "—";
+    const oldVal = activityValueLabel(activity, metadata.oldValue);
+    const newVal = activityValueLabel(activity, metadata.newValue);
     return (
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-[#4b585c]">
         <span className="font-medium text-[#71807c]">Státuszváltás:</span>

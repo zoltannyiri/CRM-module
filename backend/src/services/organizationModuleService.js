@@ -8,6 +8,7 @@ export const DEFAULT_ORGANIZATION_MODULES = Object.freeze([
   "PROJECTS",
   "TASKS",
   "DOCUMENTS",
+  "OFFERS",
 ]);
 
 const moduleKeySet = new Set(MODULE_KEYS);

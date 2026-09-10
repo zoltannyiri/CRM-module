@@ -46,6 +46,7 @@ enum ActivityEntityType {
   PROJECT
   TASK
   DOCUMENT
+  OFFER
 }
 
 enum ActivityAction {
@@ -63,7 +64,7 @@ enum ModuleKey {
   PROJECTS
   TASKS
   DOCUMENTS
-  QUOTES
+  OFFERS
 
   LEADS
   PIPELINE
@@ -98,12 +99,26 @@ enum PermissionKey {
   DOCUMENTS_DELETE
   DOCUMENTS_DOWNLOAD
 
+  OFFERS_VIEW
+  OFFERS_CREATE
+  OFFERS_EDIT
+  OFFERS_DELETE
+
   ACTIVITY_VIEW
 }
 
 enum DocumentEntityType {
   PARTNER
   PROJECT
+}
+
+enum OfferStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
 }
 
 model Organization {
@@ -119,6 +134,8 @@ model Organization {
   tasks       Task[]
   activities  Activity[]
   documents   Document[]
+  offers      Offer[]
+  offerSequences OfferSequence[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -150,6 +167,7 @@ model OrganizationMember {
   activities    Activity[]
   permissions   OrganizationMemberPermission[]
   uploadedDocuments Document[]
+  createdOffers Offer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -241,6 +259,7 @@ model Partner {
 
   contacts Contact[]
   projects Project[]
+  offers   Offer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -283,6 +302,7 @@ model Project {
   startDate   DateTime?
   deadline    DateTime?
   tasks       Task[]
+  offers      Offer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -369,3 +389,59 @@ model DocumentLink {
   @@index([entityType, entityId])
 }
 
+model Offer {
+  id                Int                 @id @default(autoincrement())
+  organizationId    Int
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  offerNumber       String
+  partnerId         Int
+  partner           Partner             @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  projectId         Int?
+  project           Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  status            OfferStatus         @default(DRAFT)
+  issueDate         DateTime             @db.Date
+  validUntil        DateTime             @db.Date
+  currency          String               @default("HUF") @db.VarChar(3)
+  note              String?
+  createdByMemberId Int?
+  createdByMember   OrganizationMember? @relation(fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  items             OfferItem[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([organizationId, offerNumber])
+  @@index([organizationId])
+  @@index([partnerId])
+  @@index([projectId])
+  @@index([organizationId, status])
+  @@index([createdByMemberId])
+}
+
+model OfferItem {
+  id          Int      @id @default(autoincrement())
+  offerId     Int
+  offer       Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  quantity    Decimal  @db.Decimal(18, 4)
+  unit        String   @db.VarChar(32)
+  unitPrice   Decimal  @db.Decimal(18, 2)
+  vatRate     Decimal  @db.Decimal(5, 2)
+  position    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([offerId, position])
+}
+
+model OfferSequence {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  year           Int
+  lastNumber     Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, year])
+  @@index([organizationId])
+}

@@ -1,6 +1,6 @@
 import activityService from "../services/activityService.js";
 
-const VALID_ENTITY_TYPES = new Set(["PARTNER", "CONTACT", "PROJECT", "TASK", "DOCUMENT"]);
+const VALID_ENTITY_TYPES = new Set(["PARTNER", "CONTACT", "PROJECT", "TASK", "DOCUMENT", "OFFER"]);
 const VALID_ACTIONS = new Set([
   "CREATED",
   "UPDATED",
