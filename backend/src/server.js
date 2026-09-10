@@ -52,12 +52,14 @@ app.use((error, _req, res, _next) => {
   if (statusCode >= 500) console.error(error);
 
   return res.status(statusCode).json({
-    message: statusCode >= 500
-      ? "A művelet technikai hiba miatt nem hajtható végre. Kérjük, próbálja meg később. Ha a hiba továbbra is fennáll, vegye fel a kapcsolatot az üzemeltetővel: zoltan.nyiri02@gmail.com"
-      : error.message,
-    ...(error?.code && { code: error.code }),
-    ...(error?.permission && { permission: error.permission }),
-    ...(error?.module && { module: error.module }),
+    message:
+      statusCode >= 500
+        ? "A művelet technikai hiba miatt nem hajtható végre. Kérjük, próbálja meg később. Ha a hiba továbbra is fennáll, vegye fel a kapcsolatot az üzemeltetővel: zoltan.nyiri02@gmail.com"
+        : error.message,
+
+    ...(statusCode < 500 && error?.code && { code: error.code }),
+    ...(statusCode < 500 && error?.permission && { permission: error.permission }),
+    ...(statusCode < 500 && error?.module && { module: error.module }),
   });
 });
 
