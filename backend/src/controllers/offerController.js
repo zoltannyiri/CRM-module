@@ -14,7 +14,7 @@ function parseDate(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
 }
 
-function normalizePayload(body, { partial = false } = {}) {
+export function normalizePayload(body, { partial = false } = {}) {
   const source = body || {};
   const data = {};
   const has = (key) => Object.hasOwn(source, key);
@@ -33,7 +33,7 @@ function normalizePayload(body, { partial = false } = {}) {
     }
   }
   if (!partial || has("status")) {
-    const status = source.status || "DRAFT";
+    const status = partial ? source.status : source.status || "DRAFT";
     if (!OFFER_STATUSES.has(status)) return { error: "Érvénytelen ajánlatstátusz." };
     data.status = status;
   }

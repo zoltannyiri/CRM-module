@@ -8,9 +8,25 @@ import { calculateDraftTotals, formatMoney } from "./offerDisplay.js";
 const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3.5 text-sm text-[#263338] outline-none transition placeholder:text-[#a1abaa] focus:border-[#79a97e] focus:ring-2 focus:ring-[#79a97e]/15";
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
 const emptyItem = () => ({ name: "", description: "", quantity: "1", unit: "db", unitPrice: "0", vatRate: "27" });
-const dateInput = (value) => value ? new Date(value).toISOString().slice(0, 10) : "";
-const defaultIssueDate = new Date().toISOString().slice(0, 10);
-const defaultExpiryDate = new Date(new Date(`${defaultIssueDate}T00:00:00.000Z`).getTime() + 30 * 86400000).toISOString().slice(0, 10);
+const dateInput = (value) => value ? String(value).slice(0, 10) : "";
+
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function initialOfferDates(offer) {
+  const storedIssueDate = dateInput(offer?.issueDate);
+  const storedValidUntil = dateInput(offer?.validUntil);
+  if (storedIssueDate && storedValidUntil) return { issueDate: storedIssueDate, validUntil: storedValidUntil };
+
+  const issueDateValue = new Date();
+  const validUntilValue = new Date(issueDateValue);
+  validUntilValue.setDate(validUntilValue.getDate() + 30);
+  return { issueDate: formatLocalDate(issueDateValue), validUntil: formatLocalDate(validUntilValue) };
+}
 
 export default function OfferFormComponent(props) {
   const { hasPermission } = useAuth();
@@ -25,11 +41,12 @@ function OfferForm({ mode = "create", offer, defaultPartnerId, defaultProjectId,
   const isEditing = mode === "edit";
   const canUsePartners = hasModule("PARTNERS") && hasPermission("PARTNERS_VIEW");
   const canUseProjects = hasModule("PROJECTS") && hasPermission("PROJECTS_VIEW");
+  const [initialDates] = useState(() => initialOfferDates(offer));
   const [partnerId, setPartnerId] = useState(() => String(defaultPartnerId || offer?.partner?.id || ""));
   const [projectId, setProjectId] = useState(() => String(defaultProjectId || offer?.project?.id || ""));
   const [status, setStatus] = useState(() => offer?.status || "DRAFT");
-  const [issueDate, setIssueDate] = useState(() => dateInput(offer?.issueDate) || defaultIssueDate);
-  const [validUntil, setValidUntil] = useState(() => dateInput(offer?.validUntil) || defaultExpiryDate);
+  const [issueDate, setIssueDate] = useState(initialDates.issueDate);
+  const [validUntil, setValidUntil] = useState(initialDates.validUntil);
   const [currency, setCurrency] = useState(() => offer?.currency || "HUF");
   const [note, setNote] = useState(() => offer?.note || "");
   const [items, setItems] = useState(() => offer?.items?.length ? offer.items.map((item) => ({ ...item })) : [emptyItem()]);
