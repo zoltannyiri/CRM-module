@@ -1,6 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { getEnabledModules } from "./organizationModuleService.js";
 import { getEffectivePermissions } from "./permissionService.js";
+import { getAllowedActivityEntityTypes } from "./activityService.js";
 
 const OPEN_TASK_STATUSES = ["TODO", "IN_PROGRESS", "BLOCKED"];
 const UPCOMING_PROJECT_STATUSES = ["PLANNED", "ACTIVE", "ON_HOLD"];
@@ -25,11 +26,16 @@ export async function getDashboard({ organizationId, membership, now = new Date(
   const canActivity = permissions.has("ACTIVITY_VIEW");
   const { start, endExclusive } = utcDayWindow(now);
 
+  const allowedActivityEntityTypes = getAllowedActivityEntityTypes({
+    enabledModules,
+    permissions: effectivePermissions,
+  });
+
   const [partnerCount, activeProjectCount, openTaskCount, overdueTaskCount, myTasks, projectDeadlines, taskDeadlines, recentActivities] = await Promise.all([
     canPartners ? prisma.partner.count({ where: { organizationId } }) : null,
     canProjects ? prisma.project.count({ where: { organizationId, status: "ACTIVE" } }) : null,
     canTasks ? prisma.task.count({ where: { organizationId, status: { in: OPEN_TASK_STATUSES } } }) : null,
-    canTasks ? prisma.task.count({ where: { organizationId, status: { in: OPEN_TASK_STATUSES }, dueDate: { lt: now } } }) : null,
+    canTasks ? prisma.task.count({ where: { organizationId, status: { in: OPEN_TASK_STATUSES }, dueDate: { lt: start } } }) : null,
     canTasks ? prisma.task.findMany({
       where: { organizationId, assigneeMemberId: membership.id, status: { in: OPEN_TASK_STATUSES } },
       select: {
@@ -51,8 +57,11 @@ export async function getDashboard({ organizationId, membership, now = new Date(
       orderBy: { dueDate: "asc" },
       take: 8,
     }) : [],
-    canActivity ? prisma.activity.findMany({
-      where: { organizationId },
+    (canActivity && allowedActivityEntityTypes.length > 0) ? prisma.activity.findMany({
+      where: {
+        organizationId,
+        entityType: { in: allowedActivityEntityTypes },
+      },
       select: {
         id: true, entityType: true, entityId: true, action: true, title: true, description: true, createdAt: true,
         actorMember: { select: { user: { select: { firstName: true, lastName: true } } } },

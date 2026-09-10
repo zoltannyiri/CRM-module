@@ -69,6 +69,7 @@ async function getActivities(req, res, next) {
 
     const activities = await activityService.getActivities({
       organizationId: req.organization.id,
+      membership: req.membership,
       entityType,
       entityId,
       actorMemberId,
