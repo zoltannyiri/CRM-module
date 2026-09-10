@@ -44,6 +44,23 @@ app.use("/api/activities", activityRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/documents", documentRoutes);
 
+app.use((error, _req, res, _next) => {
+  const candidateStatus = error?.statusCode ?? error?.status;
+  const statusCode = Number.isInteger(candidateStatus) && candidateStatus >= 400 && candidateStatus <= 599
+    ? candidateStatus
+    : 500;
+  if (statusCode >= 500) console.error(error);
+
+  return res.status(statusCode).json({
+    message: statusCode >= 500
+      ? "A művelet technikai hiba miatt nem hajtható végre. Kérjük, próbálja meg később. Ha a hiba továbbra is fennáll, vegye fel a kapcsolatot az üzemeltetővel: zoltan.nyiri02@gmail.com"
+      : error.message,
+    ...(error?.code && { code: error.code }),
+    ...(error?.permission && { permission: error.permission }),
+    ...(error?.module && { module: error.module }),
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

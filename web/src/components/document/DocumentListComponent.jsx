@@ -97,6 +97,7 @@ export default function DocumentListComponent({
     try {
       const response = await apiClient.get(`/documents/${doc.id}/download`, {
         responseType: "blob",
+        skipGlobalErrorToast: true,
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = window.document.createElement("a");
@@ -121,7 +122,7 @@ export default function DocumentListComponent({
     if (!window.confirm(`Biztosan törölni szeretnéd ezt a dokumentumot: ${doc.name}?`)) return;
     setDeletingId(doc.id);
     try {
-      await apiClient.delete(`/documents/${doc.id}`);
+      await apiClient.delete(`/documents/${doc.id}`, { skipGlobalErrorToast: true });
       setResult((current) => ({ ...current, documents: current.documents.filter(({ id }) => id !== doc.id), error: "" }));
       setSelected((current) => current.filter((id) => id !== doc.id));
       showSuccess("A dokumentum sikeresen törölve.");

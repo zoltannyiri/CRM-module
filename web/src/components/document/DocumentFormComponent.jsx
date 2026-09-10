@@ -47,17 +47,8 @@ function DocumentForm({
   const canUsePartners = hasModule("PARTNERS") && hasPermission("PARTNERS_VIEW");
   const canUseProjects = hasModule("PROJECTS") && hasPermission("PROJECTS_VIEW");
 
-  // Initial partner / project from existing doc links if editing
-  const existingPartnerId = doc?.partner?.id
-    ? String(doc.partner.id)
-    : doc?.links?.find((l) => l.entityType === "PARTNER")?.entityId
-      ? String(doc.links.find((l) => l.entityType === "PARTNER").entityId)
-      : "";
-  const existingProjectId = doc?.project?.id
-    ? String(doc.project.id)
-    : doc?.links?.find((l) => l.entityType === "PROJECT")?.entityId
-      ? String(doc.links.find((l) => l.entityType === "PROJECT").entityId)
-      : "";
+  const existingPartnerId = doc?.partner?.id ? String(doc.partner.id) : "";
+  const existingProjectId = doc?.project?.id ? String(doc.project.id) : "";
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [name, setName] = useState(() => doc?.name || "");
@@ -150,8 +141,8 @@ function DocumentForm({
           name: name.trim(),
           category: category ? category.trim() : null,
           note: note ? note.trim() : null,
-          partnerId: partnerId ? Number(partnerId) : null,
-          projectId: projectId ? Number(projectId) : null,
+          ...(canUsePartners && { partnerId: partnerId ? Number(partnerId) : null }),
+          ...(canUseProjects && { projectId: projectId ? Number(projectId) : null }),
         };
         const response = await apiClient.patch(`/documents/${doc.id}`, payload);
         onSaved?.(response.data);

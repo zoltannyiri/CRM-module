@@ -19,12 +19,10 @@ function getSafeFileExtension(originalFileName = "") {
 }
 
 function resolveStoragePath(storageKey) {
-  const baseDir = getBaseStorageDir();
-  // Normalize and guard against directory traversal
-  const normalizedKey = path.normalize(storageKey).replace(/^(\.\.(\/|\\|$))+/, "");
-  const fullPath = path.join(baseDir, normalizedKey);
-
-  if (!fullPath.startsWith(baseDir)) {
+  const baseDir = path.resolve(getBaseStorageDir());
+  const fullPath = path.resolve(baseDir, storageKey);
+  const relativePath = path.relative(baseDir, fullPath);
+  if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     throw new Error("Érvénytelen tárolási azonosító.");
   }
   return fullPath;
@@ -90,14 +88,43 @@ export async function deleteFile({ storageKey }) {
     const fullPath = resolveStoragePath(storageKey);
     await fs.unlink(fullPath);
   } catch (error) {
-    if (error.code !== "ENOENT") {
-      console.error(`Hiba a fájl törlésekor (${storageKey}):`, error);
-    }
+    if (error.code !== "ENOENT") throw error;
   }
+}
+
+/**
+ * Moves a file aside before a related database delete. The caller can then
+ * either commit the deletion or restore the original file if the DB fails.
+ */
+export async function stageFileDeletion({ storageKey }) {
+  if (!storageKey) throw new Error("Hiányzó tárolási azonosító.");
+  const originalPath = resolveStoragePath(storageKey);
+  const stagedPath = `${originalPath}.deleting-${randomUUID()}`;
+  try {
+    await fs.rename(originalPath, stagedPath);
+  } catch (error) {
+    if (error.code === "ENOENT") return { existed: false, commit: async () => {}, rollback: async () => {} };
+    throw error;
+  }
+  let settled = false;
+  return {
+    existed: true,
+    async commit() {
+      if (settled) return;
+      await fs.unlink(stagedPath);
+      settled = true;
+    },
+    async rollback() {
+      if (settled) return;
+      await fs.rename(stagedPath, originalPath);
+      settled = true;
+    },
+  };
 }
 
 export default {
   saveFile,
   getFile,
   deleteFile,
+  stageFileDeletion,
 };

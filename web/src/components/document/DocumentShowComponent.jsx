@@ -81,6 +81,7 @@ export default function DocumentShowComponent({ documentId, onEdit }) {
     try {
       const response = await apiClient.get(`/documents/${documentData.id}/download`, {
         responseType: "blob",
+        skipGlobalErrorToast: true,
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = window.document.createElement("a");
@@ -102,7 +103,7 @@ export default function DocumentShowComponent({ documentId, onEdit }) {
     if (!window.confirm(`Biztosan törölni szeretnéd ezt a dokumentumot: ${documentData.name}?`)) return;
     setDeleting(true);
     try {
-      await apiClient.delete(`/documents/${documentData.id}`);
+      await apiClient.delete(`/documents/${documentData.id}`, { skipGlobalErrorToast: true });
       showSuccess("A dokumentum sikeresen törölve.");
       navigate("/document");
     } catch {

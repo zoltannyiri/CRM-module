@@ -104,6 +104,7 @@ export default function PartnerDocumentsComponent({ partnerId }) {
     try {
       const response = await apiClient.get(`/documents/${doc.id}/download`, {
         responseType: "blob",
+        skipGlobalErrorToast: true,
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = window.document.createElement("a");

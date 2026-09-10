@@ -22,6 +22,19 @@ const documentInclude = {
   links: true,
 };
 
+export class DocumentServiceError extends Error {
+  constructor(message, statusCode, details = {}) {
+    super(message);
+    this.statusCode = statusCode;
+    Object.assign(this, details);
+  }
+}
+
+function toPublicDocument(document, relations = {}) {
+  const { storageKey: _storageKey, links: _links, ...safeDocument } = document;
+  return { ...safeDocument, ...relations };
+}
+
 async function checkEntityAccess(organizationId, membership, client = prisma) {
   const [enabledModules, effectivePermissions] = await Promise.all([
     getEnabledModules(organizationId, client),
@@ -81,13 +94,32 @@ async function attachEntitiesToDocuments(documents, organizationId, canViewPartn
     }
 
     // Exclude internal storageKey from public responses
-    const { storageKey: _storageKey, ...safeDoc } = doc;
-    return {
-      ...safeDoc,
-      partner,
-      project,
-    };
+    return toPublicDocument(doc, { partner, project });
   });
+}
+
+async function validateLinkedEntities({
+  organizationId,
+  membership,
+  partnerId,
+  projectId,
+  partnerIdProvided = partnerId != null,
+  projectIdProvided = projectId != null,
+}, client = prisma) {
+  if (!partnerIdProvided && !projectIdProvided) return;
+  const access = await checkEntityAccess(organizationId, membership, client);
+  if (partnerIdProvided && !access.canViewPartners) {
+    throw new DocumentServiceError("Nincs jogosultsága a partnerhez kapcsoláshoz.", 403, { code: "PERMISSION_DENIED", permission: "PARTNERS_VIEW" });
+  }
+  if (projectIdProvided && !access.canViewProjects) {
+    throw new DocumentServiceError("Nincs jogosultsága a projekthez kapcsoláshoz.", 403, { code: "PERMISSION_DENIED", permission: "PROJECTS_VIEW" });
+  }
+  const [partner, project] = await Promise.all([
+    partnerId != null ? client.partner.findFirst({ where: { id: partnerId, organizationId }, select: { id: true } }) : true,
+    projectId != null ? client.project.findFirst({ where: { id: projectId, organizationId }, select: { id: true } }) : true,
+  ]);
+  if (!partner) throw new DocumentServiceError("A megadott partner nem található.", 404);
+  if (!project) throw new DocumentServiceError("A megadott projekt nem található.", 404);
 }
 
 /**
@@ -217,39 +249,19 @@ export async function getDocumentForDownload(
 export async function createDocument({
   organizationId,
   actorMemberId,
+  membership,
   file,
   name,
   category = null,
   note = null,
   partnerId = null,
   projectId = null,
-}) {
+}, client = prisma) {
   if (!file || !file.buffer) {
     throw new Error("Fájl megadása kötelező.");
   }
   if (!name || !name.trim()) {
     throw new Error("A megnevezés kitöltése kötelező.");
-  }
-
-  // Validate linked entities belong to current tenant
-  if (partnerId) {
-    const partner = await prisma.partner.findFirst({
-      where: { id: partnerId, organizationId },
-      select: { id: true },
-    });
-    if (!partner) {
-      throw new Error("A megadott partner nem található.");
-    }
-  }
-
-  if (projectId) {
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, organizationId },
-      select: { id: true },
-    });
-    if (!project) {
-      throw new Error("A megadott projekt nem található.");
-    }
   }
 
   // 1. Save file to storage
@@ -261,7 +273,9 @@ export async function createDocument({
 
   // 2. Transaction: Document + Links + Activity
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await client.$transaction(async (tx) => {
+      await validateLinkedEntities({ organizationId, membership, partnerId, projectId }, tx);
+
       const doc = await tx.document.create({
         data: {
           organizationId,
@@ -315,13 +329,12 @@ export async function createDocument({
         tx,
       );
 
-      const created = await tx.document.findUnique({
-        where: { id: doc.id },
+      const created = await tx.document.findFirst({
+        where: { id: doc.id, organizationId },
         include: documentInclude,
       });
 
-      const { storageKey: _storageKey, ...safeDoc } = created;
-      return safeDoc;
+      return toPublicDocument(created);
     });
   } catch (error) {
     // Cleanup storage file on DB error
@@ -336,42 +349,31 @@ export async function createDocument({
 export async function updateDocument({
   organizationId,
   actorMemberId,
+  membership,
   documentId,
   data,
-}) {
+}, client = prisma) {
   const { name, category, note, partnerId, projectId } = data;
 
   if (name !== undefined && (!name || !name.trim())) {
     throw new Error("A megnevezés kitöltése kötelező.");
   }
 
-  // Validate linked entities
-  if (partnerId !== undefined && partnerId !== null) {
-    const partner = await prisma.partner.findFirst({
-      where: { id: partnerId, organizationId },
-      select: { id: true },
-    });
-    if (!partner) {
-      throw new Error("A megadott partner nem található.");
-    }
-  }
-
-  if (projectId !== undefined && projectId !== null) {
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, organizationId },
-      select: { id: true },
-    });
-    if (!project) {
-      throw new Error("A megadott projekt nem található.");
-    }
-  }
-
-  return prisma.$transaction(async (tx) => {
+  return client.$transaction(async (tx) => {
     const existing = await tx.document.findFirst({
       where: { id: documentId, organizationId },
       include: { links: true },
     });
     if (!existing) return null;
+
+    await validateLinkedEntities({
+      organizationId,
+      membership,
+      partnerId,
+      projectId,
+      partnerIdProvided: partnerId !== undefined,
+      projectIdProvided: projectId !== undefined,
+    }, tx);
 
     const updateData = {};
     if (name !== undefined) updateData.name = name.trim();
@@ -383,16 +385,15 @@ export async function updateDocument({
     }
 
     const updatedDoc = await tx.document.update({
-      where: { id: documentId },
+      where: { id: documentId, organizationId },
       data: updateData,
     });
 
     // Handle link changes if provided
-    if (partnerId !== undefined || projectId !== undefined) {
+    if (partnerId !== undefined) {
       await tx.documentLink.deleteMany({
-        where: { documentId },
+        where: { documentId, entityType: "PARTNER", document: { organizationId } },
       });
-
       if (partnerId) {
         await tx.documentLink.create({
           data: {
@@ -402,7 +403,11 @@ export async function updateDocument({
           },
         });
       }
-
+    }
+    if (projectId !== undefined) {
+      await tx.documentLink.deleteMany({
+        where: { documentId, entityType: "PROJECT", document: { organizationId } },
+      });
       if (projectId) {
         await tx.documentLink.create({
           data: {
@@ -427,48 +432,51 @@ export async function updateDocument({
       tx,
     );
 
-    const result = await tx.document.findUnique({
-      where: { id: documentId },
+    const result = await tx.document.findFirst({
+      where: { id: documentId, organizationId },
       include: documentInclude,
     });
 
-    const { storageKey: _storageKey, ...safeDoc } = result;
-    return safeDoc;
+    return toPublicDocument(result);
   });
 }
 
 /**
  * Deletes a document and its physical file.
  */
-export async function deleteDocument({ organizationId, actorMemberId, documentId }) {
-  const existing = await prisma.document.findFirst({
+export async function deleteDocument({ organizationId, actorMemberId, documentId }, client = prisma) {
+  const existing = await client.document.findFirst({
     where: { id: documentId, organizationId },
     select: { id: true, name: true, storageKey: true },
   });
 
   if (!existing) return false;
 
-  await prisma.$transaction(async (tx) => {
-    await activityService.createActivity(
-      {
-        organizationId,
-        actorMemberId,
-        entityType: "DOCUMENT",
-        entityId: documentId,
-        action: "DELETED",
-        title: "Dokumentum törölve",
-        description: existing.name,
-      },
-      tx,
-    );
+  const stagedFile = await storageService.stageFileDeletion({ storageKey: existing.storageKey });
+  try {
+    await client.$transaction(async (tx) => {
+      await activityService.createActivity(
+        {
+          organizationId,
+          actorMemberId,
+          entityType: "DOCUMENT",
+          entityId: documentId,
+          action: "DELETED",
+          title: "Dokumentum törölve",
+          description: existing.name,
+        },
+        tx,
+      );
 
-    await tx.document.delete({
-      where: { id: documentId },
+      await tx.document.delete({
+        where: { id: documentId, organizationId },
+      });
     });
-  });
-
-  // Clean up physical file after successful DB deletion
-  await storageService.deleteFile({ storageKey: existing.storageKey });
+  } catch (error) {
+    await stagedFile.rollback();
+    throw error;
+  }
+  await stagedFile.commit();
 
   return true;
 }

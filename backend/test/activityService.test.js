@@ -9,10 +9,10 @@ test("getAllowedActivityEntityTypes computes allowed entity types from modules a
   // All enabled and viewable
   assert.deepEqual(
     getAllowedActivityEntityTypes({
-      enabledModules: ["PARTNERS", "PROJECTS", "TASKS"],
-      permissions: ["PARTNERS_VIEW", "PROJECTS_VIEW", "TASKS_VIEW", "ACTIVITY_VIEW"],
+      enabledModules: ["PARTNERS", "PROJECTS", "TASKS", "DOCUMENTS"],
+      permissions: ["PARTNERS_VIEW", "PROJECTS_VIEW", "TASKS_VIEW", "DOCUMENTS_VIEW", "ACTIVITY_VIEW"],
     }),
-    ["PARTNER", "CONTACT", "PROJECT", "TASK"]
+    ["PARTNER", "CONTACT", "PROJECT", "TASK", "DOCUMENT"]
   );
 
   // Missing PROJECTS_VIEW
@@ -58,6 +58,22 @@ test("getAllowedActivityEntityTypes computes allowed entity types from modules a
       permissions: ["PARTNERS_VIEW", "ACTIVITY_VIEW"],
     }),
     ["PARTNER", "CONTACT"]
+  );
+
+  assert.deepEqual(
+    getAllowedActivityEntityTypes({
+      enabledModules: ["DOCUMENTS"],
+      permissions: ["DOCUMENTS_VIEW", "ACTIVITY_VIEW"],
+    }),
+    ["DOCUMENT"]
+  );
+
+  assert.deepEqual(
+    getAllowedActivityEntityTypes({
+      enabledModules: ["DOCUMENTS"],
+      permissions: ["ACTIVITY_VIEW"],
+    }),
+    []
   );
 });
 

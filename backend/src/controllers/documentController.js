@@ -32,6 +32,7 @@ const DISALLOWED_EXTENSIONS = new Set([
   ".scr",
   ".jar",
 ]);
+const DOCUMENT_ENTITY_TYPES = new Set(["PARTNER", "PROJECT"]);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -91,6 +92,13 @@ export async function getDocuments(req, res, next) {
     const entityType = req.query.entityType ? String(req.query.entityType).toUpperCase() : undefined;
     const entityId = parsePositiveId(req.query.entityId);
     const sortDirection = req.query.sortDirection === "asc" ? "asc" : "desc";
+
+    if (entityType && !DOCUMENT_ENTITY_TYPES.has(entityType)) {
+      return res.status(400).json({ message: "Érvénytelen dokumentumkapcsolat-típus." });
+    }
+    if ((entityType && !entityId) || (!entityType && req.query.entityId !== undefined)) {
+      return res.status(400).json({ message: "Az entityType és egy pozitív entityId együtt adandó meg." });
+    }
 
     const documents = await documentService.getDocuments({
       organizationId: req.organization.id,
@@ -164,6 +172,7 @@ export async function createDocument(req, res, next) {
     const document = await documentService.createDocument({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id || null,
+      membership: req.membership,
       file: req.file,
       name,
       category,
@@ -205,10 +214,16 @@ export async function updateDocument(req, res, next) {
 
     if (body.partnerId !== undefined) {
       data.partnerId = parsePositiveId(body.partnerId);
+      if (body.partnerId !== null && body.partnerId !== "" && !data.partnerId) {
+        return res.status(400).json({ message: "Érvénytelen partner azonosító." });
+      }
     }
 
     if (body.projectId !== undefined) {
       data.projectId = parsePositiveId(body.projectId);
+      if (body.projectId !== null && body.projectId !== "" && !data.projectId) {
+        return res.status(400).json({ message: "Érvénytelen projekt azonosító." });
+      }
     }
 
     const updated = await documentService.updateDocument({
@@ -273,13 +288,14 @@ export async function downloadDocument(req, res, next) {
       return res.status(404).json({ message: "A fájl nem található a tárolóban." });
     }
 
-    const safeFilename = encodeURIComponent(document.originalFileName);
+    const safeFilename = encodeURIComponent(document.originalFileName).replace(/['()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+    const asciiFilename = document.originalFileName.replace(/[^\x20-\x7E]|["\\]/g, "_");
 
     res.setHeader("Content-Type", document.mimeType || "application/octet-stream");
     res.setHeader("Content-Length", file.size);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${document.originalFileName.replace(/[^\x20-\x7E]/g, "_")}"; filename*=UTF-8''${safeFilename}`,
+      `attachment; filename="${asciiFilename}"; filename*=UTF-8''${safeFilename}`,
     );
 
     const stream = file.createReadStream();
