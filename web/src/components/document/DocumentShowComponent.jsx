@@ -59,8 +59,6 @@ export default function DocumentShowComponent({ documentId, onEdit }) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
 
     apiClient.get(`/documents/${documentId}`)
       .then(({ data }) => {
