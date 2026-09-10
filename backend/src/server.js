@@ -11,6 +11,7 @@ import memberRoutes from "./routes/memberRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import documentRoutes from "./routes/documentRoutes.js";
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use("/api/members", memberRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/documents", documentRoutes);
 
 const PORT = process.env.PORT || 5000;
 

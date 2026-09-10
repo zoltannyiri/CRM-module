@@ -45,6 +45,7 @@ enum ActivityEntityType {
   CONTACT
   PROJECT
   TASK
+  DOCUMENT
 }
 
 enum ActivityAction {
@@ -91,7 +92,18 @@ enum PermissionKey {
   TASKS_DELETE
   TASKS_ASSIGN
 
+  DOCUMENTS_VIEW
+  DOCUMENTS_CREATE
+  DOCUMENTS_EDIT
+  DOCUMENTS_DELETE
+  DOCUMENTS_DOWNLOAD
+
   ACTIVITY_VIEW
+}
+
+enum DocumentEntityType {
+  PARTNER
+  PROJECT
 }
 
 model Organization {
@@ -106,6 +118,7 @@ model Organization {
   modules     OrganizationModule[]
   tasks       Task[]
   activities  Activity[]
+  documents   Document[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -136,6 +149,7 @@ model OrganizationMember {
   assignedTasks Task[]
   activities    Activity[]
   permissions   OrganizationMemberPermission[]
+  uploadedDocuments Document[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -320,3 +334,38 @@ model Activity {
   @@index([actorMemberId])
   @@index([createdAt])
 }
+
+model Document {
+  id             Int                 @id @default(autoincrement())
+  organizationId Int
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  originalFileName String
+  mimeType       String
+  size           Int
+  storageKey     String
+  category       String?
+  note           String?
+  uploadedByMemberId Int?
+  uploadedByMember OrganizationMember? @relation(fields: [uploadedByMemberId], references: [id], onDelete: SetNull)
+  links          DocumentLink[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizationId])
+  @@index([uploadedByMemberId])
+  @@index([createdAt])
+}
+
+model DocumentLink {
+  id         Int                @id @default(autoincrement())
+  documentId Int
+  document   Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  entityType DocumentEntityType
+  entityId   Int
+  createdAt  DateTime           @default(now())
+
+  @@unique([documentId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+

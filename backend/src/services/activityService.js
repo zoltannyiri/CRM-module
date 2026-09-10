@@ -51,6 +51,12 @@ export function getAllowedActivityEntityTypes({ enabledModules = [], permissions
     allowed.push(ActivityEntityType.TASK);
   }
 
+  const hasDocuments = (modules.has(ModuleKey.DOCUMENTS) || modules.has("DOCUMENTS")) &&
+    (perms.has(PermissionKey.DOCUMENTS_VIEW) || perms.has("DOCUMENTS_VIEW"));
+  if (hasDocuments) {
+    allowed.push(ActivityEntityType.DOCUMENT);
+  }
+
   return allowed;
 }
 

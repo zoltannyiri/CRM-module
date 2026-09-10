@@ -7,6 +7,7 @@ import PartnerExportMenu from "../components/partner/PartnerExportMenu.jsx";
 import PartnerListComponent from "../components/partner/PartnerListComponent.jsx";
 import PartnerShowComponent from "../components/partner/PartnerShowComponent.jsx";
 import PartnerContactsComponent from "../components/partner/PartnerContactsComponent.jsx";
+import PartnerDocumentsComponent from "../components/partner/PartnerDocumentsComponent.jsx";
 import PartnerActivityComponent from "../components/partner/PartnerActivityComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
@@ -47,7 +48,7 @@ function getStoredViewMode() {
 }
 
 export default function PartnerPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasModule } = useAuth();
   const { showError } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -134,6 +135,11 @@ export default function PartnerPage() {
             <TabPanel header="Kapcsolattartók">
               <PartnerContactsComponent key={id} partnerId={id} />
             </TabPanel>
+            {hasModule("DOCUMENTS") && hasPermission("DOCUMENTS_VIEW") && (
+              <TabPanel header="Dokumentumok">
+                <PartnerDocumentsComponent key={id} partnerId={id} />
+              </TabPanel>
+            )}
             {hasPermission("ACTIVITY_VIEW") && <TabPanel header="Tevékenységek">
               <PartnerActivityComponent key={id} partnerId={id} />
             </TabPanel>}

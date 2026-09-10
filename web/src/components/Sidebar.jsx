@@ -8,6 +8,7 @@ const icons = {
   contacts: <><circle cx="9" cy="7" r="3" /><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3" /></>,
   products: <path d="M3 7V5a2 2 0 0 1 2-2h5l3 4h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />,
   projects: <><path d="M4 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12h20" /></>,
+  documents: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" /></>,
   messages: <><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /><path d="M7 10h.01M12 10h.01M17 10h.01" /></>,
   activities: <path d="M2 12h4l4-9 4 18 4-9h4" />,
   settings: <><path d="m9 3-1 3-3 1-2 4 2 2v3l3 2 1 3h5l1-3 3-2v-3l2-2-2-4-3-1-1-3Z" /><circle cx="11.5" cy="12" r="3" /></>,
@@ -26,6 +27,7 @@ const navigation = [
   { id: "pipeline", label: "Értékesítés", children: ["Folyamatok", "Lehetőségek"] },
   { id: "contacts", label: "Partnerek", module: "PARTNERS", permission: "PARTNERS_VIEW", children: ["Összes partner", "Kapcsolattartók"] },
   { id: "projects", label: "Projektek", module: "PROJECTS", permission: "PROJECTS_VIEW", route: "/project" },
+  { id: "documents", label: "Dokumentumok", module: "DOCUMENTS", permission: "DOCUMENTS_VIEW", route: "/document" },
   { id: "products", label: "Termékek", children: ["Összes termék", "Kategóriák"] },
   { id: "messages", label: "Üzenetek" },
   { id: "activities", label: "Tevékenységek", children: ["Tevékenységek", "Feladatok", "Naptár"] },
@@ -43,6 +45,7 @@ const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/contact")) return "contacts-1";
   if (pathname.startsWith("/partner")) return "contacts-0";
   if (pathname.startsWith("/project")) return "projects";
+  if (pathname.startsWith("/document")) return "documents";
   if (pathname.startsWith("/activity")) return "activities-0";
   if (pathname.startsWith("/task")) return "activities-1";
   if (pathname.startsWith("/settings")) return "settings";

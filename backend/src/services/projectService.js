@@ -170,6 +170,10 @@ async function deleteProject({ organizationId, actorMemberId, projectId }) {
       tx,
     );
 
+    await tx.documentLink.deleteMany({
+      where: { entityType: "PROJECT", entityId: projectId },
+    });
+
     const result = await tx.project.deleteMany({ where: { id: projectId, organizationId } });
     return result.count === 1;
   });

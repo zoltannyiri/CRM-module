@@ -153,6 +153,10 @@ async function deletePartner({ organizationId, actorMemberId, partnerId }) {
       tx,
     );
 
+    await tx.documentLink.deleteMany({
+      where: { entityType: "PARTNER", entityId: partnerId },
+    });
+
     return tx.partner.delete({
       where: { id: partnerId, organizationId },
     });

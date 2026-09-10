@@ -8,6 +8,7 @@ import ContactPage from "./pages/ContactPage.jsx";
 import PartnerPage from "./pages/PartnerPage.jsx";
 import ProjectPage from "./pages/ProjectPage.jsx";
 import TaskPage from "./pages/TaskPage.jsx";
+import DocumentPage from "./pages/DocumentPage.jsx";
 import ActivityPage from "./pages/ActivityPage.jsx";
 import ModuleRoute from "./components/ModuleRoute.jsx";
 import PermissionRoute from "./components/PermissionRoute.jsx";
@@ -71,6 +72,18 @@ function App() {
           path="/task"
           element={
             <Workspace><ModuleRoute module="TASKS"><PermissionRoute permission="TASKS_VIEW"><TaskPage /></PermissionRoute></ModuleRoute></Workspace>
+          }
+        />
+        <Route
+          path="/document"
+          element={
+            <Workspace><ModuleRoute module="DOCUMENTS"><PermissionRoute permission="DOCUMENTS_VIEW"><DocumentPage /></PermissionRoute></ModuleRoute></Workspace>
+          }
+        />
+        <Route
+          path="/document/:id"
+          element={
+            <Workspace><ModuleRoute module="DOCUMENTS"><PermissionRoute permission="DOCUMENTS_VIEW"><DocumentPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
         <Route

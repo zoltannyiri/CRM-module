@@ -7,6 +7,7 @@ import ProjectFormComponent from "../components/project/ProjectFormComponent.jsx
 import ProjectListComponent from "../components/project/ProjectListComponent.jsx";
 import ProjectShowComponent from "../components/project/ProjectShowComponent.jsx";
 import ProjectTasksComponent from "../components/project/ProjectTasksComponent.jsx";
+import ProjectDocumentsComponent from "../components/project/ProjectDocumentsComponent.jsx";
 import ProjectActivityComponent from "../components/project/ProjectActivityComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
@@ -87,6 +88,11 @@ export default function ProjectPage() {
             {hasModule("TASKS") && hasPermission("TASKS_VIEW") && (
               <TabPanel header="Feladatok">
                 <ProjectTasksComponent projectId={id} />
+              </TabPanel>
+            )}
+            {hasModule("DOCUMENTS") && hasPermission("DOCUMENTS_VIEW") && (
+              <TabPanel header="Dokumentumok">
+                <ProjectDocumentsComponent key={id} projectId={id} />
               </TabPanel>
             )}
             {hasPermission("ACTIVITY_VIEW") && <TabPanel header="Tevékenységek">
