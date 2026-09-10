@@ -22,7 +22,7 @@ function Icon({ name, className = "", size = "size-[19px]" }) {
 }
 
 const navigation = [
-  { id: "dashboard", label: "Áttekintés" },
+  { id: "dashboard", label: "Dashboard", route: "/dashboard" },
   { id: "pipeline", label: "Értékesítés", children: ["Folyamatok", "Lehetőségek"] },
   { id: "contacts", label: "Partnerek", module: "PARTNERS", permission: "PARTNERS_VIEW", children: ["Összes partner", "Kapcsolattartók"] },
   { id: "projects", label: "Projektek", module: "PROJECTS", permission: "PROJECTS_VIEW", route: "/project" },
@@ -39,6 +39,7 @@ const childRoutes = {
 };
 
 const activeItemForPath = (pathname) => {
+  if (pathname.startsWith("/dashboard")) return "dashboard";
   if (pathname.startsWith("/contact")) return "contacts-1";
   if (pathname.startsWith("/partner")) return "contacts-0";
   if (pathname.startsWith("/project")) return "projects";

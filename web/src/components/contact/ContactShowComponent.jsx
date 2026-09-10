@@ -9,9 +9,6 @@ export default function ContactShowComponent({ contactId }) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
-
     apiClient
       .get(`/contacts/${contactId}`)
       .then(({ data }) => {

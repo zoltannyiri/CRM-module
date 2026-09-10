@@ -10,6 +10,7 @@ import projectRoutes from "./routes/projectRoutes.js";
 import memberRoutes from "./routes/memberRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/activities", activityRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 const PORT = process.env.PORT || 5000;
 

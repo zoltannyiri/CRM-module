@@ -14,9 +14,6 @@ export default function PartnerActivityComponent({ partnerId }) {
   useEffect(() => {
     if (!canView) return undefined;
     let active = true;
-    setLoading(true);
-    setError("");
-
     apiClient
       .get("/activities", {
         params: {

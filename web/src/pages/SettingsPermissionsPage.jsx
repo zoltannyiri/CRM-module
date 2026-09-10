@@ -11,6 +11,10 @@ const groups = [
   { title: "Tevékenységek", permissions: [["ACTIVITY_VIEW", "Megtekintés"]] },
 ];
 
+function canManageMember(member, role, actorMemberId) {
+  return role === "OWNER" ? member.role !== "OWNER" : role === "ADMIN" && member.role === "USER" && member.id !== actorMemberId;
+}
+
 export default function SettingsPermissionsPage() {
   const { user, permissions: ownPermissions, hasModule } = useAuth();
   const { showSuccess } = useToast();
@@ -22,21 +26,21 @@ export default function SettingsPermissionsPage() {
   const [error, setError] = useState("");
   const role = user?.role;
   const actorMemberId = user?.organizationMemberId;
-  const canManage = (member) => role === "OWNER" ? member.role !== "OWNER" : role === "ADMIN" && member.role === "USER" && member.id !== actorMemberId;
-  const manageable = useMemo(() => members.filter(canManage), [members, role, actorMemberId]);
+  const manageable = useMemo(() => members.filter((member) => canManageMember(member, role, actorMemberId)), [members, role, actorMemberId]);
   const selected = members.find(({ id }) => id === selectedId);
 
   useEffect(() => {
-    if (role !== "OWNER" && role !== "ADMIN") { setLoading(false); return; }
+    if (role !== "OWNER" && role !== "ADMIN") return undefined;
     apiClient.get("/members").then(({ data }) => {
       setMembers(data);
-      setSelectedId(data.find(canManage)?.id || null);
-    }).catch((requestError) => setError(requestError.message || "A tagok betöltése sikertelen.")).finally(() => setLoading(false));
+      const firstId = data.find((member) => canManageMember(member, role, actorMemberId))?.id || null;
+      setSelectedId(firstId);
+      if (!firstId) setLoading(false);
+    }).catch((requestError) => { setError(requestError.message || "A tagok betöltése sikertelen."); setLoading(false); });
   }, [role, actorMemberId]);
 
   useEffect(() => {
-    if (!selectedId) { setDraft([]); return; }
-    setLoading(true);
+    if (!selectedId) return undefined;
     apiClient.get(`/members/${selectedId}/permissions`).then(({ data }) => {
       setDraft(data.permissions || []);
       setError("");
@@ -64,8 +68,8 @@ export default function SettingsPermissionsPage() {
       <div className="mt-1 mb-6 flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-xl font-semibold">Tagi jogosultságok</h1><p className="mt-1 text-sm text-[#71807c]">A szervezeti tagok hozzáférése modulonként és műveletenként kezelhető.</p></div><button type="button" onClick={save} disabled={!selected || saving || loading} className="h-10 rounded-md bg-[#263b40] px-5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Mentés…" : "Jogosultságok mentése"}</button></div>
       {error && <p role="alert" className="mb-4 rounded-md border border-[#efd7d1] bg-[#fdf1ee] px-4 py-3 text-sm text-[#9a4335]">{error}</p>}
       <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
-        <section className="rounded-xl border border-[#dbe1df] bg-white p-3"><h2 className="px-2 pb-3 text-xs font-semibold">Kezelhető tagok</h2>{manageable.length === 0 ? <p className="px-2 py-6 text-xs text-[#7b8885]">Nincs kezelhető szervezeti tag.</p> : manageable.map((member) => <button key={member.id} type="button" onClick={() => setSelectedId(member.id)} className={`mb-1 w-full rounded-lg px-3 py-3 text-left ${selectedId === member.id ? "bg-[#eff6ee]" : "hover:bg-[#f5f7f6]"}`}><span className="block text-sm font-semibold">{member.user.firstName} {member.user.lastName}</span><span className="mt-1 block text-[11px] text-[#7b8885]">{member.user.email} · {member.role}</span></button>)}</section>
-        <section className="rounded-xl border border-[#dbe1df] bg-white p-5">{!selected ? <p className="py-16 text-center text-sm text-[#7b8885]">Válassz egy tagot.</p> : loading ? <div className="grid min-h-64 place-items-center"><i className="pi pi-spinner pi-spin text-2xl text-[#6fa675]" /></div> : <div className="grid gap-4 sm:grid-cols-2">{groups.map((group) => { const enabled = !group.module || hasModule(group.module); return <fieldset key={group.title} disabled={!enabled} className={`rounded-lg border p-4 ${enabled ? "border-[#dfe5e3]" : "border-[#e5e8e7] bg-[#f6f7f7] opacity-55"}`}><legend className="px-1 text-sm font-semibold">{group.title}</legend>{!enabled && <p className="mb-2 text-[11px] text-[#7b8885]">A modul nincs bekapcsolva.</p>}<div className="grid gap-2">{group.permissions.map(([key, label]) => { const grantable = role === "OWNER" || ownPermissions.includes(key); return <label key={key} className={`flex items-center gap-3 rounded-md px-2 py-2 text-xs ${grantable && enabled ? "cursor-pointer hover:bg-[#f5f8f5]" : "opacity-55"}`}><input type="checkbox" checked={draft.includes(key)} onChange={() => toggle(key)} disabled={!enabled || !grantable} className="size-4 accent-[#6fa675]" />{label}</label>; })}</div></fieldset>; })}</div>}</section>
+        <section className="rounded-xl border border-[#dbe1df] bg-white p-3"><h2 className="px-2 pb-3 text-xs font-semibold">Kezelhető tagok</h2>{manageable.length === 0 ? <p className="px-2 py-6 text-xs text-[#7b8885]">Nincs kezelhető szervezeti tag.</p> : manageable.map((member) => <button key={member.id} type="button" onClick={() => { setLoading(true); setSelectedId(member.id); }} className={`mb-1 w-full rounded-lg px-3 py-3 text-left ${selectedId === member.id ? "bg-[#eff6ee]" : "hover:bg-[#f5f7f6]"}`}><span className="block text-sm font-semibold">{member.user.firstName} {member.user.lastName}</span><span className="mt-1 block text-[11px] text-[#7b8885]">{member.user.email} · {member.role}</span></button>)}</section>
+        <section className="rounded-xl border border-[#dbe1df] bg-white p-5">{!selected ? <p className="py-16 text-center text-sm text-[#7b8885]">Válassz egy tagot.</p> : loading ? <div className="grid min-h-64 place-items-center"><i className="pi pi-spinner pi-spin text-2xl text-[#6fa675]" /></div> : <div className="grid gap-4 sm:grid-cols-2">{groups.map((group) => { const enabled = !group.module || hasModule(group.module); return <fieldset key={group.title} disabled={!enabled} className={`rounded-lg border p-4 ${enabled ? "border-[#dfe5e3]" : "border-[#e5e8e7] bg-[#f6f7f7] opacity-55"}`}><legend className="px-1 text-sm font-semibold">{group.title}</legend>{!enabled && <p className="mb-2 text-[11px] text-[#7b8885]">A modul nincs bekapcsolva.</p>}<div className="grid gap-2">{group.permissions.map(([key, label]) => { const grantable = role === "OWNER" || ownPermissions.includes(key); const checked = draft.includes(key); return <label key={key} className={`flex items-center gap-3 rounded-md px-2 py-2 text-xs ${(grantable || checked) && enabled ? "cursor-pointer hover:bg-[#f5f8f5]" : "opacity-55"}`}><input type="checkbox" checked={checked} onChange={() => toggle(key)} disabled={!enabled || (!grantable && !checked)} className="size-4 accent-[#6fa675]" />{label}</label>; })}</div></fieldset>; })}</div>}</section>
       </div>
     </div>
   </div>;

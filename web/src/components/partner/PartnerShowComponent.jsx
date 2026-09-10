@@ -9,9 +9,6 @@ export default function PartnerShowComponent({ partnerId }) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
-
     apiClient
       .get(`/partners/${partnerId}`)
       .then(({ data }) => {

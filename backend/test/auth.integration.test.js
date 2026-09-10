@@ -52,6 +52,7 @@ test("auth and tenant authorization HTTP integration", {
   const { default: taskRoutes } = await import("../src/routes/taskRoutes.js");
   const { default: activityRoutes } = await import("../src/routes/activityRoutes.js");
   const { default: memberRoutes } = await import("../src/routes/memberRoutes.js");
+  const { default: dashboardRoutes } = await import("../src/routes/dashboardRoutes.js");
   const { default: requireModule } = await import("../src/middleware/requireModule.js");
   const { generateAccessToken, hashRefreshToken, hashInviteToken } = await import("../src/utils/token.js");
   const app = express();
@@ -63,6 +64,7 @@ test("auth and tenant authorization HTTP integration", {
   app.use("/api/tasks", taskRoutes);
   app.use("/api/activities", activityRoutes);
   app.use("/api/members", memberRoutes);
+  app.use("/api/dashboard", dashboardRoutes);
   app.use((error, _req, res, _next) => res.status(500).json({ message: error.message }));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -254,6 +256,41 @@ test("auth and tenant authorization HTTP integration", {
         assert.equal((await request(`/api/members/${foreignMembership.id}/permissions`, { token: ownerToken })).status, 404);
 
         await tx.organizationMemberPermission.createMany({ data: [memberships.ADMIN.id, memberships.USER.id].flatMap((organizationMemberId) => Object.values(PermissionKey).map((permission) => ({ organizationMemberId, permission }))), skipDuplicates: true });
+      });
+
+      await t.test("dashboard aggregates only tenant, module and permission allowed data", async () => {
+        const now = new Date();
+        const inSevenDays = new Date(now); inSevenDays.setUTCDate(inSevenDays.getUTCDate() + 7);
+        const inThirtyDays = new Date(now); inThirtyDays.setUTCDate(inThirtyDays.getUTCDate() + 30);
+        const yesterday = new Date(now); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+        const activeProject = await tx.project.create({ data: { organizationId: org.id, name: "Dashboard project", status: "ACTIVE", deadline: inSevenDays } });
+        await tx.project.create({ data: { organizationId: org.id, name: "Far project", status: "ACTIVE", deadline: inThirtyDays } });
+        await tx.task.create({ data: { organizationId: org.id, projectId: activeProject.id, assigneeMemberId: memberships.OWNER.id, title: "My open task", status: "TODO", dueDate: inSevenDays } });
+        await tx.task.create({ data: { organizationId: org.id, assigneeMemberId: memberships.ADMIN.id, title: "Other task", status: "TODO", dueDate: yesterday } });
+        await tx.task.create({ data: { organizationId: org.id, assigneeMemberId: memberships.OWNER.id, title: "Done old task", status: "DONE", dueDate: yesterday } });
+        await tx.activity.create({ data: { organizationId: org.id, actorMemberId: memberships.OWNER.id, entityType: "PROJECT", entityId: activeProject.id, action: "CREATED", title: "Dashboard activity" } });
+        await tx.partner.create({ data: { organizationId: otherOrg.id, name: "Foreign dashboard partner" } });
+
+        const ownerDashboard = await request("/api/dashboard", { token: ownerToken });
+        assert.equal(ownerDashboard.status, 200);
+        assert.deepEqual(ownerDashboard.body.stats.map(({ key }) => key), ["partners", "activeProjects", "openTasks", "overdueTasks"]);
+        assert.deepEqual(ownerDashboard.body.myTasks.map(({ title }) => title), ["My open task"]);
+        assert.deepEqual(ownerDashboard.body.upcomingDeadlines.map(({ title }) => title).sort(), ["Dashboard project", "My open task"].sort());
+        assert.equal(ownerDashboard.body.recentActivities[0].title, "Dashboard activity");
+        assert.equal(ownerDashboard.body.stats.find(({ key }) => key === "overdueTasks").value, 1);
+
+        await tx.organizationMemberPermission.deleteMany({ where: { organizationMemberId: memberships.USER.id } });
+        await tx.organizationMemberPermission.create({ data: { organizationMemberId: memberships.USER.id, permission: "PARTNERS_VIEW" } });
+        const restricted = await request("/api/dashboard", { token: generateAccessToken(users.USER) });
+        assert.deepEqual(restricted.body.stats.map(({ key }) => key), ["partners"]);
+        assert.equal("myTasks" in restricted.body, false);
+        assert.equal("upcomingDeadlines" in restricted.body, false);
+        assert.equal("recentActivities" in restricted.body, false);
+
+        await tx.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } }, data: { enabled: false } });
+        assert.deepEqual((await request("/api/dashboard", { token: generateAccessToken(users.USER) })).body.stats, []);
+        await tx.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } }, data: { enabled: true } });
+        await tx.organizationMemberPermission.createMany({ data: Object.values(PermissionKey).map((permission) => ({ organizationMemberId: memberships.USER.id, permission })), skipDuplicates: true });
       });
 
       let invitationToken;

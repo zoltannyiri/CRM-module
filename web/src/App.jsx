@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
@@ -12,6 +12,7 @@ import ActivityPage from "./pages/ActivityPage.jsx";
 import ModuleRoute from "./components/ModuleRoute.jsx";
 import PermissionRoute from "./components/PermissionRoute.jsx";
 import SettingsPermissionsPage from "./pages/SettingsPermissionsPage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
 
 function Workspace({ children }) {
   return (
@@ -79,7 +80,8 @@ function App() {
           }
         />
         <Route path="/settings/permissions" element={<Workspace><SettingsPermissionsPage /></Workspace>} />
-        <Route path="/" element={<Workspace />} />
+        <Route path="/dashboard" element={<Workspace><DashboardPage /></Workspace>} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );
