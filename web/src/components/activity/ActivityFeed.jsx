@@ -7,6 +7,7 @@ const entityLabels = {
   TASK: "Feladat",
   DOCUMENT: "Dokumentum",
   OFFER: "Ajánlat",
+  LEAD: "Érdeklődő",
 };
 
 const entityClasses = {
@@ -15,6 +16,7 @@ const entityClasses = {
   PROJECT: "border-[#d4e4da] bg-[#eef7f1] text-[#3c6b45]",
   TASK: "border-[#e0dce8] bg-[#f4f1f9] text-[#5e4b77]",
   DOCUMENT: "border-[#d8e2e6] bg-[#f0f4f7] text-[#446574]",
+  LEAD: "border-[#d0ded5] bg-[#edf4f0] text-[#3e684a]",
   OFFER: "border-[#e8ddc5] bg-[#faf6ec] text-[#816d40]",
 };
 
@@ -55,6 +57,10 @@ const valueLabels = {
   // Partner types
   COMPANY: "Cég",
   PERSON: "Magánszemély",
+  NEW: "Új",
+  CONTACTED: "Kapcsolatfelvétel megtörtént",
+  QUALIFIED: "Minősített",
+  LOST: "Elveszett",
   DRAFT: "Piszkozat",
   SENT: "Elküldve",
   ACCEPTED: "Elfogadva",
@@ -69,6 +75,9 @@ function activityValueLabel(activity, value) {
 
 const fieldLabels = {
   name: "Név",
+  companyName: "Cégnév",
+  source: "Forrás",
+  assignedMemberId: "Felelős",
   title: "Cím",
   description: "Leírás",
   note: "Megjegyzés",

@@ -47,6 +47,7 @@ enum ActivityEntityType {
   TASK
   DOCUMENT
   OFFER
+  LEAD
 }
 
 enum ActivityAction {
@@ -104,6 +105,11 @@ enum PermissionKey {
   OFFERS_EDIT
   OFFERS_DELETE
 
+  LEADS_VIEW
+  LEADS_CREATE
+  LEADS_EDIT
+  LEADS_DELETE
+
   ACTIVITY_VIEW
 }
 
@@ -136,6 +142,7 @@ model Organization {
   documents   Document[]
   offers      Offer[]
   offerSequences OfferSequence[]
+  leads       Lead[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -168,6 +175,8 @@ model OrganizationMember {
   permissions   OrganizationMemberPermission[]
   uploadedDocuments Document[]
   createdOffers Offer[]
+  assignedLeads Lead[] @relation("LeadAssignee")
+  createdLeads Lead[] @relation("LeadCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -444,4 +453,44 @@ model OfferSequence {
 
   @@unique([organizationId, year])
   @@index([organizationId])
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  LOST
+}
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  PHONE
+  EMAIL
+  SOCIAL
+  OTHER
+}
+model Lead {
+  id Int @id @default(autoincrement())
+  organizationId Int
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name String
+  companyName String?
+  email String?
+  phone String?
+  status LeadStatus @default(NEW)
+  source LeadSource @default(OTHER)
+  note String?
+  assignedMemberId Int?
+  assignedMember OrganizationMember? @relation("LeadAssignee", fields: [assignedMemberId], references: [id], onDelete: SetNull)
+  createdByMemberId Int?
+  createdByMember OrganizationMember? @relation("LeadCreator", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, source])
+  @@index([organizationId, assignedMemberId])
+  @@index([assignedMemberId])
+  @@index([createdByMemberId])
 }

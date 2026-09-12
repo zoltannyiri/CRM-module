@@ -9,6 +9,7 @@ const icons = {
   products: <path d="M3 7V5a2 2 0 0 1 2-2h5l3 4h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />,
   projects: <><path d="M4 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12h20" /></>,
   documents: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" /></>,
+  leads: <><circle cx="12" cy="7" r="3" /><path d="M5 21v-3a7 7 0 0 1 14 0v3" /></>,
   offers: <><path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5" /></>,
   messages: <><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /><path d="M7 10h.01M12 10h.01M17 10h.01" /></>,
   activities: <path d="M2 12h4l4-9 4 18 4-9h4" />,
@@ -29,6 +30,7 @@ const navigation = [
   { id: "contacts", label: "Partnerek", module: "PARTNERS", permission: "PARTNERS_VIEW", children: ["Összes partner", "Kapcsolattartók"] },
   { id: "projects", label: "Projektek", module: "PROJECTS", permission: "PROJECTS_VIEW", route: "/project" },
   { id: "documents", label: "Dokumentumok", module: "DOCUMENTS", permission: "DOCUMENTS_VIEW", route: "/document" },
+  { id: "leads", label: "Érdeklődők", module: "LEADS", permission: "LEADS_VIEW", route: "/lead" },
   { id: "offers", label: "Ajánlatok", module: "OFFERS", permission: "OFFERS_VIEW", route: "/offer" },
   { id: "products", label: "Termékek", children: ["Összes termék", "Kategóriák"] },
   { id: "messages", label: "Üzenetek" },
@@ -48,6 +50,7 @@ const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/partner")) return "contacts-0";
   if (pathname.startsWith("/project")) return "projects";
   if (pathname.startsWith("/document")) return "documents";
+  if (pathname.startsWith("/lead")) return "leads";
   if (pathname.startsWith("/offer")) return "offers";
   if (pathname.startsWith("/activity")) return "activities-0";
   if (pathname.startsWith("/task")) return "activities-1";

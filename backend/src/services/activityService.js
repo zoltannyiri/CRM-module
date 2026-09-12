@@ -63,6 +63,8 @@ export function getAllowedActivityEntityTypes({ enabledModules = [], permissions
     allowed.push(ActivityEntityType.OFFER);
   }
 
+  if (modules.has("LEADS") && perms.has("LEADS_VIEW")) allowed.push(ActivityEntityType.LEAD);
+
   return allowed;
 }
 

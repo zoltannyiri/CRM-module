@@ -14,6 +14,7 @@ import ModuleRoute from "./components/ModuleRoute.jsx";
 import PermissionRoute from "./components/PermissionRoute.jsx";
 import SettingsPermissionsPage from "./pages/SettingsPermissionsPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
+import LeadPage from "./pages/LeadPage.jsx";
 import OfferPage from "./pages/OfferPage.jsx";
 
 function Workspace({ children }) {
@@ -87,6 +88,8 @@ function App() {
             <Workspace><ModuleRoute module="DOCUMENTS"><PermissionRoute permission="DOCUMENTS_VIEW"><DocumentPage /></PermissionRoute></ModuleRoute></Workspace>
           }
         />
+        <Route path="/lead" element={<Workspace><ModuleRoute module="LEADS"><PermissionRoute permission="LEADS_VIEW"><LeadPage /></PermissionRoute></ModuleRoute></Workspace>} />
+        <Route path="/lead/:id" element={<Workspace><ModuleRoute module="LEADS"><PermissionRoute permission="LEADS_VIEW"><LeadPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/offer" element={<Workspace><ModuleRoute module="OFFERS"><PermissionRoute permission="OFFERS_VIEW"><OfferPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/offer/:id" element={<Workspace><ModuleRoute module="OFFERS"><PermissionRoute permission="OFFERS_VIEW"><OfferPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route
