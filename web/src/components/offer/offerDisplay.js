@@ -1,3 +1,7 @@
+import Decimal from "decimal.js";
+
+const OfferDecimal = Decimal.clone({ precision: 50, rounding: Decimal.ROUND_HALF_UP });
+
 export const offerStatusLabels = {
   DRAFT: "Piszkozat",
   SENT: "Elküldve",
@@ -36,12 +40,19 @@ export function formatMoney(value, currency = "HUF") {
 }
 
 export function calculateDraftTotals(items) {
-  return items.reduce((totals, item) => {
-    const net = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
-    const vat = net * (Number(item.vatRate) || 0) / 100;
-    totals.net += net;
-    totals.vat += vat;
-    totals.gross += net + vat;
-    return totals;
-  }, { net: 0, vat: 0, gross: 0 });
+  const safeDecimal = (value) => {
+    try {
+      const amount = new OfferDecimal(value || 0);
+      return amount.isFinite() ? amount : new OfferDecimal(0);
+    } catch { return new OfferDecimal(0); }
+  };
+  let net = new OfferDecimal(0);
+  let vat = new OfferDecimal(0);
+  for (const item of items) {
+    const itemNet = safeDecimal(item.quantity).mul(safeDecimal(item.unitPrice)).toDecimalPlaces(2);
+    const itemVat = itemNet.mul(safeDecimal(item.vatRate)).div(100).toDecimalPlaces(2);
+    net = net.add(itemNet);
+    vat = vat.add(itemVat);
+  }
+  return { net: net.toFixed(2), vat: vat.toFixed(2), gross: net.add(vat).toFixed(2) };
 }

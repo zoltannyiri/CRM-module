@@ -7,12 +7,39 @@ import {
   deleteOffer,
   getOfferById,
   getOffers,
+  normalizeOfferItems,
   updateOffer,
 } from "../src/services/offerService.js";
 
 const issueDate = new Date("2026-09-10T00:00:00.000Z");
 const validUntil = new Date("2026-10-10T00:00:00.000Z");
 const inputItems = [{ name: "Tanácsadás", description: null, quantity: "2.5", unit: "óra", unitPrice: "10000", vatRate: "27" }];
+
+test("financial calculation preserves cents across the complete DB numeric range", () => {
+  const items = normalizeOfferItems([{ ...inputItems[0], quantity: "12345678901234.1234", unitPrice: "9876543210987654.32", vatRate: "100" }]);
+  const expectedCents = (123456789012341234n * 987654321098765432n + 5000n) / 10000n;
+  const fixed = (cents) => `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
+  assert.deepEqual(calculateOfferTotals(items).totals, { net: fixed(expectedCents), vat: fixed(expectedCents), gross: fixed(expectedCents * 2n) });
+});
+
+test("OfferItems reject invalid numeric inputs, empty fields and DB overflows", () => {
+  for (const items of [[], null, [{ ...inputItems[0], name: " " }], [{ ...inputItems[0], unit: " " }]]) {
+    assert.throws(() => normalizeOfferItems(items), (error) => error.statusCode === 400);
+  }
+  for (const [field, values] of Object.entries({
+    quantity: [null, "", " ", "NaN", "Infinity", -1, 0, "0.00001", "100000000000000"],
+    unitPrice: [null, "", "NaN", "Infinity", -1, "0.001", "10000000000000000"],
+    vatRate: [null, "", "NaN", "Infinity", -1, 101, "27.001"],
+  })) {
+    for (const value of values) assert.throws(() => normalizeOfferItems([{ ...inputItems[0], [field]: value }]), (error) => error.statusCode === 400, `${field}: ${value}`);
+  }
+  assert.deepEqual(normalizeOfferItems([inputItems[0], inputItems[0]]).map(({ position }) => position), [1, 2]);
+});
+
+test("totals sum the rounded line amounts using half-up cent rounding", () => {
+  const totals = calculateOfferTotals(Array.from({ length: 3 }, () => ({ quantity: "1", unitPrice: "0.01", vatRate: "50" }))).totals;
+  assert.deepEqual(totals, { net: "0.03", vat: "0.03", gross: "0.06" });
+});
 
 function record(overrides = {}) {
   return {

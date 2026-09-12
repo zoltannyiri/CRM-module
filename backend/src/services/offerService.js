@@ -5,6 +5,10 @@ import activityService from "./activityService.js";
 import { getEnabledModules } from "./organizationModuleService.js";
 import { getEffectivePermissions } from "./permissionService.js";
 
+// DB inputs can produce 30-digit products; keep cent precision without changing
+// the Decimal configuration of other modules.
+const OfferDecimal = Prisma.Decimal.clone({ precision: 50, rounding: Prisma.Decimal.ROUND_HALF_UP });
+
 const createdBySelect = {
   user: { select: { firstName: true, lastName: true } },
 };
@@ -29,7 +33,7 @@ export class OfferInputError extends Error {
 
 function decimal(value, field) {
   try {
-    const result = new Prisma.Decimal(value);
+    const result = new OfferDecimal(value);
     if (!result.isFinite()) throw new Error();
     return result;
   } catch {
@@ -71,8 +75,8 @@ export function normalizeOfferItems(items) {
 }
 
 export function calculateOfferTotals(items) {
-  let netTotal = new Prisma.Decimal(0);
-  let vatTotal = new Prisma.Decimal(0);
+  let netTotal = new OfferDecimal(0);
+  let vatTotal = new OfferDecimal(0);
   const calculatedItems = items.map((item) => {
     const quantity = decimal(item.quantity, "mennyiség");
     const unitPrice = decimal(item.unitPrice, "egységár");

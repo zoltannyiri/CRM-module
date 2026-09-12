@@ -76,7 +76,7 @@ export default function OfferListComponent({
   return (
     <section aria-labelledby={showTitle ? "offer-list-title" : undefined}>
       {showTitle && <div className="mb-4"><p className="mb-1 text-[10px] font-semibold tracking-[.12em] text-[#8a9693] uppercase">Értékesítés</p><h2 id="offer-list-title" className="text-base font-semibold text-[#29383d]">Ajánlatok</h2></div>}
-      <div className="relative overflow-hidden rounded-xl border border-[#dbe1df] bg-white shadow-[0_1px_2px_rgba(24,39,43,0.02)]" aria-busy={loading}>
+      <div className="relative overflow-x-auto rounded-xl border border-[#dbe1df] bg-white shadow-[0_1px_2px_rgba(24,39,43,0.02)]" aria-busy={loading}>
         <DataTable value={visible} dataKey="id" unstyled tableClassName="w-full min-w-[1120px] border-collapse text-left" onRowDoubleClick={(event) => canView && onView?.(event.data)} emptyMessage={<span className="block h-40 pt-16 text-center text-xs text-[#778286]">{result.error || "Nincs megjeleníthető ajánlat."}</span>}>
           <Column field="offerNumber" header="Ajánlatszám" headerClassName={headerClass} bodyClassName={cellClass} body={(offer) => canView ? <button type="button" onClick={() => onView?.(offer)} className="cursor-pointer border-0 bg-transparent p-0 text-left font-semibold text-[#263338] hover:underline">{offer.offerNumber}</button> : <span className="font-semibold">{offer.offerNumber}</span>} />
           {canViewPartners && <Column header="Partner" headerClassName={headerClass} bodyClassName={cellClass} body={(offer) => offer.partner?.name || "—"} />}
@@ -92,7 +92,7 @@ export default function OfferListComponent({
             {canDelete && <button type="button" onClick={() => handleDelete(offer)} disabled={deletingId === offer.id} className={`${actionButtonClass} text-[#a34b3d] hover:border-[#e7c9c2] hover:bg-[#fdf1ee]`} title="Törlés" aria-label={`${offer.offerNumber} törlése`}><i className={`pi ${deletingId === offer.id ? "pi-spinner pi-spin" : "pi-trash"}`} aria-hidden="true" /></button>}
           </div>} />}
         </DataTable>
-        {loading && <div className="absolute inset-x-0 top-12 grid min-h-40 place-items-center bg-white" role="status" aria-label="Ajánlatok betöltése"><i className="pi pi-spinner pi-spin text-2xl text-[#6fa675]" aria-hidden="true" /></div>}
+        {loading && <div className="absolute inset-x-0 top-12 bottom-0 grid min-h-40 place-items-center bg-white" role="status" aria-label="Ajánlatok betöltése"><i className="pi pi-spinner pi-spin text-2xl text-[#6fa675]" aria-hidden="true" /></div>}
       </div>
       {!loading && !result.error && result.offers.length > rowsPerPage && <div className="mt-5 flex justify-center"><div className="flex overflow-hidden rounded-md border border-[#d6dddc] bg-white text-xs"><button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="h-9 cursor-pointer px-4 disabled:cursor-not-allowed disabled:opacity-40">Előző</button><span className="grid min-w-10 place-items-center border-x border-[#e3e8e6] bg-[#f5f7f6]">{currentPage}</span><button type="button" disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))} className="h-9 cursor-pointer px-4 disabled:cursor-not-allowed disabled:opacity-40">Következő</button></div></div>}
     </section>

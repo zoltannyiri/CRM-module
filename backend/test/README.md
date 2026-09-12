@@ -2,7 +2,24 @@
 
 Tested with Node.js 24.13.1, module mocking enabled, and installed backend dependencies.
 
-`npm test` runs the token test. Database integration tests are skipped unless explicitly enabled.
+`npm test` runs the backend unit/regression suites. Database integration tests are skipped unless explicitly enabled.
+
+## Offers database audit
+
+From `backend`, enable `OFFERS_DB_TESTS=1` to run `test/offer.database.test.js`.
+This deploys the complete migration chain into a uniquely named scratch schema,
+then exercises real concurrent creates, transaction rollback, CRUD, route permissions,
+tenant isolation, relation visibility, strict filters, activity and backfill behavior.
+The schema is removed in `finally`; existing application rows are never changed.
+The database account must be allowed to create/drop schemas. Prisma's database-wide
+advisory migration lock is disabled only for this independently owned scratch schema,
+so session locks cannot be retained by a transaction pooler.
+
+```powershell
+$env:OFFERS_DB_TESTS = '1'
+node --experimental-test-module-mocks --test test/offer.database.test.js
+Remove-Item Env:OFFERS_DB_TESTS
+```
 
 To run the HTTP integration suite in PowerShell from `backend`, with `DATABASE_URL`
 pointing to a PostgreSQL database matching `prisma/schema.prisma`:

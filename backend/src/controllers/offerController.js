@@ -4,6 +4,7 @@ const OFFER_STATUSES = new Set(["DRAFT", "SENT", "ACCEPTED", "REJECTED", "EXPIRE
 const EDITABLE_FIELDS = new Set(["partnerId", "projectId", "status", "issueDate", "validUntil", "currency", "note", "items"]);
 
 function parsePositiveId(value) {
+  if (typeof value !== "number" && (typeof value !== "string" || !/^\d+$/.test(value))) return null;
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
@@ -33,7 +34,7 @@ export function normalizePayload(body, { partial = false } = {}) {
     }
   }
   if (!partial || has("status")) {
-    const status = partial ? source.status : source.status || "DRAFT";
+    const status = !partial && !has("status") ? "DRAFT" : source.status;
     if (!OFFER_STATUSES.has(status)) return { error: "Érvénytelen ajánlatstátusz." };
     data.status = status;
   }
@@ -53,6 +54,7 @@ export function normalizePayload(body, { partial = false } = {}) {
     data.currency = currency;
   }
   if (!partial || has("note")) {
+    if (source.note !== undefined && source.note !== null && typeof source.note !== "string") return { error: "A megjegyzés szöveg vagy null lehet." };
     data.note = typeof source.note === "string" && source.note.trim() ? source.note.trim() : null;
   }
   if (!partial || has("items")) data.items = source.items;
@@ -61,8 +63,8 @@ export function normalizePayload(body, { partial = false } = {}) {
 
 async function getOffers(req, res, next) {
   try {
-    const status = req.query.status ? String(req.query.status).toUpperCase() : undefined;
-    if (status && !OFFER_STATUSES.has(status)) return res.status(400).json({ message: "Érvénytelen ajánlatstátusz." });
+    const status = req.query.status === undefined ? undefined : typeof req.query.status === "string" ? req.query.status.toUpperCase() : null;
+    if (req.query.status !== undefined && !OFFER_STATUSES.has(status)) return res.status(400).json({ message: "Érvénytelen ajánlatstátusz." });
     const partnerId = req.query.partnerId === undefined ? undefined : parsePositiveId(req.query.partnerId);
     if (req.query.partnerId !== undefined && !partnerId) return res.status(400).json({ message: "A partnerId pozitív egész szám kell legyen." });
     const projectId = req.query.projectId === undefined ? undefined : parsePositiveId(req.query.projectId);
