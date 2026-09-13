@@ -20,7 +20,7 @@ export async function getLeads({ organizationId, status, source, assignedMemberI
       ...(term && { OR: ["name", "companyName", "email", "phone"].map((field) => ({ [field]: { contains: term, mode: "insensitive" } })) }),
     },
     select: leadSelect,
-    orderBy: { id: sortDirection },
+    orderBy: [{ createdAt: sortDirection }, { id: sortDirection }],
   });
 }
 

@@ -91,6 +91,22 @@ test("Leads real database CRUD, authorization and migration", {
         assert.equal(required.body.source, "OTHER");
         assert.equal(required.body.assignedMemberId, null);
       });
+      await t.test("createdAt sorting overrides ID order with stable ties in both directions", async () => {
+        const fixture = { organizationId: org.id, name: "Sorting fixture", status: "QUALIFIED", source: "SOCIAL", assignedMemberId: admin.membership.id };
+        const newest = await prisma.lead.create({ data: { ...fixture, createdAt: new Date("2026-03-01T00:00:00Z") } });
+        const oldest = await prisma.lead.create({ data: { ...fixture, createdAt: new Date("2026-01-01T00:00:00Z") } });
+        const tieOne = await prisma.lead.create({ data: { ...fixture, createdAt: new Date("2026-02-01T00:00:00Z") } });
+        const tieTwo = await prisma.lead.create({ data: { ...fixture, createdAt: tieOne.createdAt } });
+        await prisma.lead.create({ data: { ...fixture, organizationId: other.id, assignedMemberId: null, createdAt: oldest.createdAt } });
+        for (const [direction, expected] of [
+          ["asc", [oldest.id, tieOne.id, tieTwo.id, newest.id]],
+          ["desc", [newest.id, tieTwo.id, tieOne.id, oldest.id]],
+        ]) {
+          const result = await request(`/api/leads?search=Sorting&status=QUALIFIED&source=SOCIAL&assignedMemberId=${admin.membership.id}&sortDirection=${direction}`);
+          assert.equal(result.status, 200);
+          assert.deepEqual(result.body.map(({ id }) => id), expected);
+        }
+      });
       await t.test("tenant isolation denies foreign show/edit/delete and assignment", async () => {
         assert.equal((await request("/api/leads")).body.some(({ id }) => id === foreign.id), false);
         for (const method of ["GET", "PATCH", "DELETE"]) assert.equal((await request(`/api/leads/${foreign.id}`, { method, body: method === "PATCH" ? { name: "Changed" } : undefined })).status, 404);

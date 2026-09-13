@@ -32,6 +32,12 @@ export default function LeadListComponent({
   canDelete = canDelete && hasPermission("LEADS_DELETE");
   const [result, setResult] = useState({ leads: [], resolvedKey: null, error: "" });
   const [page, setPage] = useState(1);
+  const paginationKey = JSON.stringify([query, statusFilter, sourceFilter, assignedMemberId, sortDirection]);
+  const [previousPaginationKey, setPreviousPaginationKey] = useState(paginationKey);
+  if (previousPaginationKey !== paginationKey) {
+    setPreviousPaginationKey(paginationKey);
+    setPage(1);
+  }
   const [deletingId, setDeletingId] = useState(null);
   const rowsPerPage = 10;
   const requestKey = JSON.stringify([query, statusFilter, sourceFilter, assignedMemberId, sortDirection, reloadKey]);
