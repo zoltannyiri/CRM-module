@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import apiClient from "../../api/apiClient.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useToast } from "../../hooks/useToast.js";
@@ -20,9 +20,11 @@ function PipelineForm({ mode = "create", pipeline, canDelete, onClose, onSaved }
   const { showSuccess } = useToast();
   const [name, setName] = useState(pipeline?.name || "");
   const [isDefault, setIsDefault] = useState(pipeline?.isDefault || false);
-  const [stages, setStages] = useState(() => pipeline?.stages.map(({ id, name }) => ({ id, name })) || defaults.map((name) => ({ name })));
+  const [stages, setStages] = useState(() => pipeline?.stages.map(({ id, name }) => ({ id, name, key: `saved-${id}` })) || defaults.map((name, index) => ({ name, key: `new-${index}` })));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const nextStageKey = useRef(defaults.length);
+  const pending = useRef(false);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -39,11 +41,12 @@ function PipelineForm({ mode = "create", pipeline, canDelete, onClose, onSaved }
   });
   const submit = async (event) => {
     event.preventDefault();
-    if (submitting) return;
+    if (submitting || pending.current) return;
     setError("");
     if (!name.trim() || name.trim().length > 200 || !stages.length || stages.some((stage) => !stage.name.trim() || stage.name.trim().length > 200)) {
       setError("Adj meg érvényes nevet a Pipeline-nak és minden szakasznak."); return;
     }
+    pending.current = true;
     setSubmitting(true);
     const payload = { name: name.trim(), isDefault, stages: stages.map((stage) => ({ ...(stage.id !== undefined && { id: stage.id }), name: stage.name.trim() })) };
     try {
@@ -51,7 +54,7 @@ function PipelineForm({ mode = "create", pipeline, canDelete, onClose, onSaved }
       showSuccess(editing ? "Pipeline sikeresen módosítva." : "Pipeline sikeresen létrehozva.");
       onSaved?.(data); onClose();
     } catch (requestError) { setError(requestError.response?.data?.message || "A Pipeline mentése sikertelen."); }
-    finally { setSubmitting(false); }
+    finally { pending.current = false; setSubmitting(false); }
   };
   return <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="pipeline-form-title">
     <button type="button" onClick={onClose} aria-label="Pipeline űrlap bezárása" className="starting:opacity-0 absolute inset-0 cursor-pointer border-0 bg-[#17272b]/35 backdrop-blur-[1px] transition-opacity duration-200" />
@@ -59,8 +62,8 @@ function PipelineForm({ mode = "create", pipeline, canDelete, onClose, onSaved }
       <header className="flex items-start justify-between gap-6 border-b border-[#dfe5e3] bg-white px-7 py-6"><div><p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[.13em] text-[#84918e]">Pipeline</p><h2 id="pipeline-form-title" className="text-xl font-semibold">{editing ? "Pipeline beállítások" : "Új Pipeline"}</h2><p className="mt-1.5 text-sm text-[#71807c]">Pipeline és értékesítési szakaszok kezelése.</p></div><button type="button" onClick={onClose} className={buttonClass}>Bezárás</button></header>
       <form id="pipeline-form" onSubmit={submit} className="flex-1 overflow-y-auto px-7 py-7"><div className="mx-auto grid max-w-3xl gap-7">
         <section className="rounded-lg border border-[#dfe5e3] bg-white p-6"><h3 className="mb-5 text-sm font-semibold">Alapadatok</h3><label className="grid gap-2 text-xs font-medium text-[#536166]">Név<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} className={fieldClass} /></label><label className="mt-5 flex cursor-pointer items-center gap-2 text-xs text-[#536166]"><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="cursor-pointer accent-[#78ad7d]" />Alapértelmezett Pipeline</label></section>
-        <section className="rounded-lg border border-[#dfe5e3] bg-white p-6"><div className="mb-5 flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Szakaszok</h3><button type="button" disabled={stages.length >= 100} onClick={() => setStages((current) => [...current, { name: "" }])} className={buttonClass}>Szakasz hozzáadása</button></div><div className="grid gap-3">
-          {stages.map((stage, index) => <div key={stage.id || `new-${index}`} className="flex items-center gap-2"><label className="min-w-0 flex-1"><span className="sr-only">{index + 1}. szakasz neve</span><input value={stage.name} onChange={(event) => setStages((current) => current.map((item, at) => at === index ? { ...item, name: event.target.value } : item))} required maxLength={200} className={fieldClass} /></label><button type="button" disabled={index === 0} onClick={() => reorder(index, -1)} className={buttonClass} aria-label={`${index + 1}. szakasz feljebb`}><i className="pi pi-arrow-up" aria-hidden="true" /></button><button type="button" disabled={index === stages.length - 1} onClick={() => reorder(index, 1)} className={buttonClass} aria-label={`${index + 1}. szakasz lejjebb`}><i className="pi pi-arrow-down" aria-hidden="true" /></button>{(!stage.id || canDelete) && <button type="button" disabled={stages.length === 1} onClick={() => setStages((current) => current.filter((_, at) => at !== index))} className={`${buttonClass} text-[#9d3c32]`} aria-label={`${index + 1}. szakasz törlése`}><i className="pi pi-trash" aria-hidden="true" /></button>}</div>)}
+        <section className="rounded-lg border border-[#dfe5e3] bg-white p-6"><div className="mb-5 flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Szakaszok</h3><button type="button" disabled={stages.length >= 100} onClick={() => { const stage = { name: "", key: `new-${nextStageKey.current++}` }; setStages((current) => [...current, stage]); }} className={buttonClass}>Szakasz hozzáadása</button></div><div className="grid gap-3">
+          {stages.map((stage, index) => <div key={stage.key} className="flex items-center gap-2"><label className="min-w-0 flex-1"><span className="sr-only">{index + 1}. szakasz neve</span><input value={stage.name} onChange={(event) => setStages((current) => current.map((item, at) => at === index ? { ...item, name: event.target.value } : item))} required maxLength={200} className={fieldClass} /></label><button type="button" disabled={index === 0} onClick={() => reorder(index, -1)} className={buttonClass} aria-label={`${index + 1}. szakasz feljebb`}><i className="pi pi-arrow-up" aria-hidden="true" /></button><button type="button" disabled={index === stages.length - 1} onClick={() => reorder(index, 1)} className={buttonClass} aria-label={`${index + 1}. szakasz lejjebb`}><i className="pi pi-arrow-down" aria-hidden="true" /></button>{(!stage.id || canDelete) && <button type="button" disabled={stages.length === 1} onClick={() => setStages((current) => current.filter((_, at) => at !== index))} className={`${buttonClass} text-[#9d3c32]`} aria-label={`${index + 1}. szakasz törlése`}><i className="pi pi-trash" aria-hidden="true" /></button>}</div>)}
         </div><p className="mt-4 text-xs text-[#84918e]">Foglalt szakasz törlése előtt helyezd át az érdeklődőket. A változtatások a mentéskor lépnek életbe.</p></section>
         {error && <p role="alert" className="rounded-md border border-[#efd7d1] bg-[#fdf1ee] px-4 py-3 text-sm text-[#9a4335]">{error}</p>}
       </div></form>

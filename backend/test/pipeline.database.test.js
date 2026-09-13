@@ -19,11 +19,16 @@ test("Pipeline real database security, integrity and migration", {
 }, async (t) => {
   const schema = `pipeline_audit_${randomUUID().replaceAll("-", "")}`;
   assert.match(schema, /^pipeline_audit_[a-f0-9]{32}$/);
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const connectionUrl = new URL(process.env.DATABASE_URL);
+  // Migration engines use session state; Neon transaction poolers must not
+  // distribute that state across connections or concurrent scratch schemas.
+  if (connectionUrl.hostname.endsWith(".neon.tech")) connectionUrl.hostname = connectionUrl.hostname.replace("-pooler.", ".");
+  const connectionString = connectionUrl.toString();
+  const pool = new Pool({ connectionString });
   let prisma;
   try {
     await pool.query(`CREATE SCHEMA "${schema}"`);
-    const url = new URL(process.env.DATABASE_URL);
+    const url = new URL(connectionString);
     url.searchParams.set("schema", schema);
     const { stdout } = await promisify(execFile)(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "deploy"], {
       // Each run owns a fresh schema. Avoid database-wide session advisory locks
@@ -31,11 +36,12 @@ test("Pipeline real database security, integrity and migration", {
       env: { ...process.env, DATABASE_URL: url.toString(), PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1" }, timeout: 60000,
     });
     assert.match(stdout, /All migrations have been successfully applied/);
-    prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }, { schema }) });
+    prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }, { schema }) });
     mock.module("../src/lib/prisma.js", { defaultExport: prisma });
     const { default: service } = await import("../src/services/pipelineService.js");
     const { default: routes } = await import("../src/routes/pipelineRoutes.js");
     const { default: activityRoutes } = await import("../src/routes/activityRoutes.js");
+    const { default: dashboardRoutes } = await import("../src/routes/dashboardRoutes.js");
     const { generateAccessToken } = await import("../src/utils/token.js");
     const org = await prisma.organization.create({ data: { name: "Pipeline audit", slug: schema } });
     const other = await prisma.organization.create({ data: { name: "Foreign", slug: schema + "_other" } });
@@ -58,6 +64,7 @@ test("Pipeline real database security, integrity and migration", {
     app.use(express.json());
     app.use("/api/pipelines", routes);
     app.use("/api/activities", activityRoutes);
+    app.use("/api/dashboard", dashboardRoutes);
     app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : "Audit technical error" }));
     const server = app.listen(0, "127.0.0.1");
     await once(server, "listening");
@@ -99,7 +106,9 @@ test("Pipeline real database security, integrity and migration", {
         const stageId = pipeline.stages[0].id;
         assert.equal((await request(movePath(), { method: "PATCH", body: { stageId } })).status, 200);
         assert.equal(await count(), 1);
+        const unchanged = await prisma.leadPipelinePosition.findUnique({ where: { leadId: lead.id } });
         assert.equal((await request(movePath(), { method: "PATCH", body: { stageId } })).body.changed, false);
+        assert.deepEqual(await prisma.leadPipelinePosition.findUnique({ where: { leadId: lead.id } }), unchanged);
         assert.equal(await count(), 1);
         assert.equal((await prisma.lead.findUnique({ where: { id: lead.id } })).status, "QUALIFIED");
         const board = (await request(`/api/pipelines/${pipeline.id}/board`)).body;
@@ -109,12 +118,18 @@ test("Pipeline real database security, integrity and migration", {
         assert.equal(await count(), 2);
         assert.equal(await prisma.leadPipelinePosition.count({ where: { leadId: lead.id } }), 0);
         await request(movePath(), { method: "PATCH", body: { stageId } });
-        await prisma.lead.update({ where: { id: lead.id }, data: { status: "LOST" } });
+        const { updateLead } = await import("../src/services/leadService.js");
+        await updateLead({ organizationId: org.id, actorMemberId: owner.membership.id, leadId: lead.id, data: { status: "LOST" } });
         assert.equal((await prisma.leadPipelinePosition.findUnique({ where: { leadId: lead.id } })).pipelineStageId, stageId);
+        await request(movePath(), { method: "PATCH", body: { stageId: pipeline.stages[1].id } });
+        await request(movePath(), { method: "PATCH", body: { stageId } });
+        assert.equal((await prisma.lead.findUnique({ where: { id: lead.id } })).status, "LOST");
+        assert.equal(await count(), 5);
       });
       await t.test("all foreign resources and cross-pipeline stages are rejected", async () => {
         for (const method of ["GET", "PATCH", "DELETE"]) assert.equal((await request(`/api/pipelines/${foreignPipeline.id}`, { method, body: method === "PATCH" ? { name: "Attack" } : undefined })).status, 404);
         assert.equal((await request(`/api/pipelines/${foreignPipeline.id}/board`)).status, 404);
+        assert.equal((await request(`/api/pipelines/${foreignPipeline.id}/leads/${lead.id}/stage`, { method: "PATCH", body: { stageId: pipeline.stages[0].id } })).status, 404);
         for (const stageId of [foreignPipeline.stages[0].id, alternate.stages[0].id]) assert.equal((await request(movePath(), { method: "PATCH", body: { stageId } })).status, 404);
         assert.equal((await request(`/api/pipelines/${pipeline.id}/leads/${foreignLead.id}/stage`, { method: "PATCH", body: { stageId: pipeline.stages[0].id } })).status, 404);
         for (const method of ["PATCH", "DELETE"]) assert.equal((await request(`/api/pipelines/${pipeline.id}/stages/${foreignPipeline.stages[0].id}`, { method, body: method === "PATCH" ? { name: "Attack" } : undefined })).status, 404);
@@ -183,14 +198,17 @@ test("Pipeline real database security, integrity and migration", {
         for (const permissions of [["ACTIVITY_VIEW"], ["ACTIVITY_VIEW", "LEADS_VIEW"], ["ACTIVITY_VIEW", "PIPELINE_VIEW"]]) {
           await perms(permissions);
           assert.deepEqual((await request("/api/activities?action=PIPELINE_STAGE_CHANGED", { token: userToken })).body, []);
+          assert.equal((await request("/api/dashboard", { token: userToken })).body.recentActivities.some(({ action }) => action === "PIPELINE_STAGE_CHANGED"), false);
         }
         await perms(["ACTIVITY_VIEW", "LEADS_VIEW", "PIPELINE_VIEW"]);
         assert.ok((await request("/api/activities?action=PIPELINE_STAGE_CHANGED", { token: userToken })).body.length);
+        assert.ok((await request("/api/dashboard", { token: userToken })).body.recentActivities.some(({ action }) => action === "PIPELINE_STAGE_CHANGED"));
         for (const module of ["PIPELINE", "LEADS"]) {
           await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module } }, data: { enabled: false } });
           assert.equal((await request(`/api/pipelines/${pipeline.id}/board`)).status, 403);
           assert.equal((await request(movePath(), { method: "PATCH", body: { stageId: pipeline.stages[0].id } })).status, 403);
           assert.deepEqual((await request("/api/activities?action=PIPELINE_STAGE_CHANGED", { token: userToken })).body, []);
+          assert.equal((await request("/api/dashboard", { token: userToken })).body.recentActivities.some(({ action }) => action === "PIPELINE_STAGE_CHANGED"), false);
           assert.equal((await request("/api/pipelines")).status, module === "PIPELINE" ? 403 : 200);
           await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module } }, data: { enabled: true } });
         }
@@ -228,13 +246,122 @@ test("Pipeline real database security, integrity and migration", {
         await assert.rejects(prisma.pipeline.create({ data: { organizationId: org.id, name: "Duplicate default", isDefault: true } }), (error) => error.code === "P2002");
         await assert.rejects(prisma.leadPipelinePosition.create({ data: { organizationId: org.id, leadId: foreignLead.id, pipelineId: pipeline.id, pipelineStageId: pipeline.stages[0].id } }), (error) => error.code === "P2003");
         await assert.rejects(prisma.leadPipelinePosition.create({ data: { organizationId: org.id, leadId: secondLead.id, pipelineId: pipeline.id, pipelineStageId: alternate.stages[0].id } }), (error) => error.code === "P2003");
+        await assert.rejects(prisma.leadPipelinePosition.create({ data: { organizationId: org.id, leadId: secondLead.id, pipelineId: pipeline.id, pipelineStageId: foreignPipeline.stages[0].id } }), (error) => error.code === "P2003");
         await assert.rejects(prisma.pipelineStage.create({ data: { organizationId: other.id, pipelineId: pipeline.id, name: "Bad tenant", position: 100 } }), (error) => error.code === "P2003");
         await assert.rejects(prisma.pipelineStage.create({ data: { organizationId: org.id, pipelineId: pipeline.id, name: "Duplicate position", position: 1 } }), (error) => error.code === "P2002");
+      });
+      await t.test("two different stages serialize with complete Activity history", async () => {
+        const args = { organizationId: org.id, actorMemberId: owner.membership.id, leadId: secondLead.id, pipelineId: alternate.id };
+        const before = await prisma.activity.count({ where: { entityId: secondLead.id, action: "PIPELINE_STAGE_CHANGED" } });
+        await Promise.all(alternate.stages.map(({ id }) => service.moveLead({ ...args, stageId: id })));
+        const position = await prisma.leadPipelinePosition.findUnique({ where: { leadId: secondLead.id } });
+        const events = await prisma.activity.findMany({ where: { entityId: secondLead.id, action: "PIPELINE_STAGE_CHANGED" }, orderBy: { id: "desc" }, take: 2 });
+        assert.equal(await prisma.leadPipelinePosition.count({ where: { leadId: secondLead.id } }), 1);
+        assert.equal(await prisma.activity.count({ where: { entityId: secondLead.id, action: "PIPELINE_STAGE_CHANGED" } }), before + 2);
+        assert.equal(events[0].metadata.toStageId, position.pipelineStageId);
+        assert.equal(events[0].metadata.fromStageId, events[1].metadata.toStageId);
+        await service.moveLead({ ...args, stageId: null });
+      });
+      await t.test("concurrent stage creates/reorders and default updates preserve invariants", async () => {
+        const created = await service.createPipeline({ organizationId: org.id, data: { name: "Parallel stages", stages: [{ name: "A" }, { name: "B" }] } });
+        const args = { organizationId: org.id, pipelineId: created.id };
+        await Promise.all(["C", "D"].map((name) => service.mutateStage({ ...args, kind: "create", data: { name } })));
+        const stages = (await service.getPipeline(args)).stages;
+        const ids = stages.map(({ id }) => id);
+        await Promise.all([ids, [...ids].reverse()].map((stageIds) => service.mutateStage({ ...args, kind: "reorder", data: { stageIds } })));
+        const reordered = (await service.getPipeline(args)).stages;
+        assert.deepEqual(reordered.map(({ position }) => position), [1, 2, 3, 4]);
+        assert.deepEqual(reordered.map(({ id }) => id).sort(), [...ids].sort());
+        assert.ok([JSON.stringify(ids), JSON.stringify([...ids].reverse())].includes(JSON.stringify(reordered.map(({ id }) => id))));
+        await Promise.all([pipeline.id, alternate.id].map((pipelineId) => service.updatePipeline({ organizationId: org.id, pipelineId, data: { isDefault: true } })));
+        assert.equal(await prisma.pipeline.count({ where: { organizationId: org.id, isDefault: true } }), 1);
+      });
+      await t.test("move versus stage/pipeline deletion is safe in both lock orders", async () => {
+        // Pause the real winning transaction after it acquires the organization
+        // lock. The competing request starts while that lock is still held.
+        const race = async (first, second) => {
+          let entered, release;
+          const acquired = new Promise((resolve) => { entered = resolve; });
+          const held = new Promise((resolve) => { release = resolve; });
+          const gated = { $transaction: (callback, options) => prisma.$transaction((tx) => {
+            let firstQuery = true;
+            return callback(new Proxy(tx, { get(target, key) {
+              if (key === "$queryRaw") return async (...args) => {
+                const value = await target.$queryRaw(...args);
+                if (firstQuery) { firstQuery = false; entered(); await held; }
+                return value;
+              };
+              const value = target[key]; return typeof value === "function" ? value.bind(target) : value;
+            } }));
+          }, options) };
+          const winner = first(gated);
+          await acquired;
+          const competitor = second(prisma);
+          release();
+          return Promise.allSettled([winner, competitor]);
+        };
+        for (const entity of ["stage", "pipeline"]) for (const moveFirst of [true, false]) {
+          const created = await service.createPipeline({ organizationId: org.id, data: { name: `${entity} race`, stages: [{ name: "Target" }, { name: "Keep" }] } });
+          const args = { organizationId: org.id, actorMemberId: owner.membership.id, leadId: secondLead.id, pipelineId: created.id, stageId: created.stages[0].id };
+          const move = (client) => service.moveLead(args, client);
+          const remove = (client) => entity === "stage" ? service.mutateStage({ ...args, kind: "delete", data: {} }, client) : service.deletePipeline(args, client);
+          const results = await race(moveFirst ? move : remove, moveFirst ? remove : move);
+          assert.equal(results[0].status, "fulfilled");
+          assert.equal(results[1].status, "rejected");
+          assert.equal(results[1].reason.statusCode, moveFirst ? 409 : 404);
+          assert.equal(await prisma.leadPipelinePosition.count({ where: { leadId: secondLead.id } }), moveFirst ? 1 : 0);
+          assert.ok(await prisma.lead.findUnique({ where: { id: secondLead.id } }));
+          if (moveFirst) await service.moveLead({ ...args, stageId: null });
+          if (entity === "stage" || moveFirst) await service.deletePipeline(args);
+        }
+      });
+      await t.test("Lead deletion cascades only membership and retains safe historical Activity", async () => {
+        const { default: leadService } = await import("../src/services/leadService.js");
+        const created = await leadService.createLead({ organizationId: org.id, actorMemberId: owner.membership.id, data: { name: "Delete assigned Lead" } });
+        const args = { organizationId: org.id, actorMemberId: owner.membership.id, leadId: created.id, pipelineId: pipeline.id, stageId: pipeline.stages[0].id };
+        await service.moveLead(args);
+        assert.equal(await leadService.deleteLead(args), true);
+        assert.equal(await prisma.leadPipelinePosition.count({ where: { leadId: created.id } }), 0);
+        assert.ok(await service.getPipeline(args));
+        const events = await prisma.activity.findMany({ where: { entityId: created.id, entityType: "LEAD" }, orderBy: { id: "asc" } });
+        assert.deepEqual(events.map(({ action }) => action), ["CREATED", "PIPELINE_STAGE_CHANGED", "DELETED"]);
+        assert.equal(events[1].metadata.toStageId, args.stageId);
+      });
+      await t.test("organization locks do not collide and release on commit/rollback", async () => {
+        const { lockPipelineOrganization } = await import("../src/services/pipelineInitializationService.js");
+        await prisma.$transaction(async (tx) => {
+          await lockPipelineOrganization(org.id, tx);
+          await prisma.$transaction(async (otherTx) => {
+            const [own] = await otherTx.$queryRaw`SELECT pg_try_advisory_xact_lock(${org.id}::integer, -1::integer) AS locked`;
+            const [foreign] = await otherTx.$queryRaw`SELECT pg_try_advisory_xact_lock(${other.id}::integer, -1::integer) AS locked`;
+            const [leadKey] = await otherTx.$queryRaw`SELECT pg_try_advisory_xact_lock(${org.id}::integer, ${lead.id}::integer) AS locked`;
+            assert.equal(own.locked, false); assert.equal(foreign.locked, true); assert.equal(leadKey.locked, true);
+          });
+        });
+        await assert.rejects(prisma.$transaction(async (tx) => { await lockPipelineOrganization(org.id, tx); throw new Error("Rollback lock"); }), /Rollback lock/);
+        await prisma.$transaction(async (tx) => {
+          const [released] = await tx.$queryRaw`SELECT pg_try_advisory_xact_lock(${org.id}::integer, -1::integer) AS locked`;
+          assert.equal(released.locked, true);
+        });
       });
       await t.test("empty pipeline deletion and default promotion are consistent", async () => {
         const created = await service.createPipeline({ organizationId: org.id, data: { name: "Delete default", isDefault: true } });
         assert.equal((await request(`/api/pipelines/${created.id}`, { method: "DELETE" })).status, 200);
         assert.equal(await prisma.pipeline.count({ where: { organizationId: org.id, isDefault: true } }), 1);
+        const soleOrg = await prisma.organization.create({ data: { name: "Sole default", slug: schema + "_sole" } });
+        const sole = await service.createPipeline({ organizationId: soleOrg.id, data: { name: "Sole" } });
+        await service.deletePipeline({ organizationId: soleOrg.id, pipelineId: sole.id });
+        assert.deepEqual(await service.getPipelines({ organizationId: soleOrg.id }), []);
+      });
+      await t.test("board orders filtered Leads by creation time with deterministic ID ties", async () => {
+        const shared = { organizationId: org.id, companyName: "Ordering fixture", assignedMemberId: admin.membership.id };
+        const newer = await prisma.lead.create({ data: { ...shared, name: "Newest", createdAt: new Date("2030-01-02") } });
+        const older = await prisma.lead.create({ data: { ...shared, name: "Oldest", createdAt: new Date("2030-01-01") } });
+        const tied = await prisma.lead.create({ data: { ...shared, name: "Newest tie", createdAt: new Date("2030-01-02") } });
+        const board = await service.getBoard({ organizationId: org.id, pipelineId: pipeline.id, search: "Ordering fixture", assignedMemberId: admin.membership.id });
+        assert.deepEqual(board.unassignedLeads.map(({ id }) => id), [tied.id, newer.id, older.id]);
+        const empty = await service.getBoard({ organizationId: org.id, pipelineId: alternate.id, search: "Ordering fixture", assignedMemberId: user.membership.id });
+        assert.deepEqual(empty.unassignedLeads, []);
       });
       await t.test("maximum supported stage list reorders without timeout or duplicate positions", async () => {
         const large = await service.createPipeline({ organizationId: org.id, data: { name: "Large configuration", stages: Array.from({ length: 100 }, (_, index) => ({ name: "Stage " + index })) } });
@@ -279,6 +406,14 @@ test("Pipeline real database security, integrity and migration", {
       const newUser = await member("USER", newOrg.id);
       await initializeMemberPermissions(newUser.membership.id, "USER");
       assert.ok((await getEffectivePermissions(newUser.membership)).includes("PIPELINE_EDIT"));
+      const rollbackSlug = schema + "_rollback";
+      await assert.rejects(prisma.$transaction(async (tx) => {
+        const rollbackOrg = await tx.organization.create({ data: { name: "Rollback initialization", slug: rollbackSlug } });
+        await initializeOrganizationModules(rollbackOrg.id, undefined, tx);
+        assert.equal(await tx.pipeline.count({ where: { organizationId: rollbackOrg.id } }), 1);
+        throw new Error("Organization creation failed");
+      }), /Organization creation failed/);
+      assert.equal(await prisma.organization.count({ where: { slug: rollbackSlug } }), 0);
     });
   } finally {
     if (prisma) await prisma.$disconnect();

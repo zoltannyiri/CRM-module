@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import apiClient from "../api/apiClient.js";
 import Topbar from "../components/Topbar.jsx";
 import PipelineBoardComponent from "../components/pipeline/PipelineBoardComponent.jsx";
@@ -24,6 +24,7 @@ export default function PipelinePage() {
   const [form, setForm] = useState(null);
   const [moving, setMoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const pending = useRef({ move: false, delete: false });
   const current = definitions.pipelines.find((pipeline) => pipeline.id === selectedId) || definitions.pipelines.find((pipeline) => pipeline.isDefault) || definitions.pipelines[0];
   const pipelineId = current?.id;
   const requestKey = JSON.stringify([pipelineId, query, assignedMemberId, reloadKey]);
@@ -47,28 +48,41 @@ export default function PipelinePage() {
     let active = true;
     apiClient.get(`/pipelines/${pipelineId}/board`, { params: { ...(query.trim() && { search: query.trim() }), ...(assignedMemberId && { assignedMemberId }) } })
       .then(({ data }) => { if (active) setResult({ board: data, resolvedKey: requestKey, error: "" }); })
-      .catch((error) => { if (active) setResult({ board: null, resolvedKey: requestKey, error: error.response?.data?.message || "A Pipeline board nem tölthető be." }); });
+      .catch(async (error) => {
+        if (!active) return;
+        if (error.response?.status === 404) {
+          // Refresh definitions once: another user may have deleted the selection.
+          try {
+            const { data } = await apiClient.get("/pipelines", { skipGlobalErrorToast: true });
+            if (!active) return;
+            setDefinitions({ pipelines: data, loaded: true, error: "" });
+          } catch { /* Keep the original board error if recovery is unavailable. */ }
+        }
+        if (active) setResult({ board: null, resolvedKey: requestKey, error: error.response?.data?.message || "A Pipeline board nem tölthető be." });
+      });
     return () => { active = false; };
   }, [access.view, assignedMemberId, pipelineId, query, reloadKey, requestKey]);
 
   const move = async (leadId, stageId) => {
-    if (!access.edit || moving) return;
+    if (!access.edit || moving || pending.current.move) return;
+    pending.current.move = true;
     setMoving(true);
     try {
       await apiClient.patch(`/pipelines/${pipelineId}/leads/${leadId}/stage`, { stageId }, { skipGlobalErrorToast: true });
       setReloadKey((value) => value + 1);
     } catch (error) { showError(error.response?.data?.message || "A szakasz módosítása sikertelen."); }
-    finally { setMoving(false); }
+    finally { pending.current.move = false; setMoving(false); }
   };
   const removePipeline = async () => {
-    if (!access.delete || deleting || !window.confirm(`Biztosan törölni szeretnéd ezt a Pipeline-t: ${current.name}?`)) return;
+    if (!access.delete || deleting || pending.current.delete || !window.confirm(`Biztosan törölni szeretnéd ezt a Pipeline-t: ${current.name}?`)) return;
+    pending.current.delete = true;
     setDeleting(true);
     try {
       await apiClient.delete(`/pipelines/${pipelineId}`, { skipGlobalErrorToast: true });
       showSuccess("Pipeline sikeresen törölve.");
       setSelectedId(null); setReloadKey((value) => value + 1);
     } catch (error) { showError(error.response?.data?.message || "A Pipeline törlése sikertelen."); }
-    finally { setDeleting(false); }
+    finally { pending.current.delete = false; setDeleting(false); }
   };
   if (!access.view) return null;
   return <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">

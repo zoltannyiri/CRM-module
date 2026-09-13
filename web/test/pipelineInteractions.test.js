@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { setImmediate as nextTick } from "node:timers/promises";
 import { transformWithOxc } from "vite";
 import { jsx, jsxs } from "react/jsx-runtime";
 import { boardColumns, pipelineAccess } from "../src/components/pipeline/pipelineDisplay.js";
@@ -61,8 +62,8 @@ const pageSource = await readFile(new URL("../src/pages/PipelinePage.jsx", impor
 const start = pageSource.indexOf("export default function PipelinePage()");
 const end = pageSource.indexOf("  if (!access.view) return null;", start);
 assert.ok(start >= 0 && end > start);
-const createPage = new Function("useState", "useEffect", "useAuth", "useToast", "pipelineAccess", "apiClient",
-  pageSource.slice(start, end).replace("export default ", "") + "\nreturn { move, result };\n}\nreturn PipelinePage;");
+const createPage = new Function("useState", "useEffect", "useAuth", "useToast", "pipelineAccess", "apiClient", "useRef = (initial) => ({ current: initial })",
+  pageSource.slice(start, end).replace("export default ", "") + "\nreturn { move, removePipeline, result, pipelineId };\n}\nreturn PipelinePage;");
 test("Pipeline failed move leaves the board unchanged and handles the error once", async () => {
   let reload = null;
   const errors = [];
@@ -79,4 +80,105 @@ test("Pipeline failed move leaves the board unchanged and handles the error once
   assert.deepEqual(errors, ["Move rejected"]);
   assert.equal(page.result.board, fixture);
   assert.equal(reload, null);
+});
+test("Pipeline rapid move submissions send only one request before rerender", async () => {
+  const calls = [];
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const component = createPage((initial) => [initial?.pipelines ? { loaded: true, pipelines: [{ id: 1 }], error: "" } : initial, () => {}],
+    () => {}, () => ({ hasModule: () => true, hasPermission: () => true }), () => ({ showError: () => {}, showSuccess: () => {} }), pipelineAccess,
+    { patch: (...args) => { calls.push(args); return pending; } });
+  const page = component();
+  const first = page.move(42, 10);
+  const duplicate = page.move(42, 20);
+  release(); await Promise.all([first, duplicate]);
+  assert.equal(calls.length, 1);
+});
+test("Pipeline rapid deletes confirm and submit only once before rerender", async () => {
+  let confirmations = 0, calls = 0, release;
+  const originalWindow = globalThis.window;
+  globalThis.window = { confirm: () => { confirmations++; return true; } };
+  try {
+    const pending = new Promise((resolve) => { release = resolve; });
+    const component = createPage((initial) => [initial?.pipelines ? { loaded: true, pipelines: [{ id: 1, name: "Sales" }], error: "" } : initial, () => {}],
+      () => {}, () => ({ hasModule: () => true, hasPermission: () => true }), () => ({ showSuccess: () => {}, showError: () => {} }), pipelineAccess,
+      { delete: () => { calls++; return pending; } });
+    const page = component();
+    const first = page.removePipeline();
+    const second = page.removePipeline();
+    release(); await Promise.all([first, second]);
+    assert.equal(calls, 1); assert.equal(confirmations, 1);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
+  }
+});
+test("Pipeline board 404 refreshes definitions and falls back after external deletion", async () => {
+  const states = [], effects = [], calls = [];
+  let cursor = 0;
+  const component = createPage((initial) => {
+    const index = cursor++;
+    if (!(index in states)) states[index] = initial?.pipelines ? { loaded: true, pipelines: [{ id: 1, isDefault: true }, { id: 2 }], error: "" } : initial;
+    return [states[index], (next) => { states[index] = typeof next === "function" ? next(states[index]) : next; }];
+  }, (effect) => effects.push(effect), () => ({ hasModule: () => true, hasPermission: () => true }), () => ({}), pipelineAccess,
+  { get: async (url) => {
+    calls.push(url);
+    if (url.endsWith("/board")) throw { response: { status: 404, data: { message: "Deleted" } } };
+    return { data: [{ id: 2, isDefault: true }] };
+  } });
+  assert.equal(component().pipelineId, 1);
+  effects[2]();
+  await nextTick();
+  cursor = 0;
+  assert.equal(component().pipelineId, 2);
+  assert.deepEqual(calls, ["/pipelines/1/board", "/pipelines"]);
+});
+
+const formSource = await readFile(new URL("../src/components/pipeline/PipelineFormComponent.jsx", import.meta.url), "utf8");
+const formCode = (await transformWithOxc(formSource, "PipelineFormComponent.jsx", { jsx: { runtime: "automatic" } })).code;
+const createForm = new Function("useState", "useEffect", "useToast", "apiClient", "_jsx", "_jsxs", "useRef = (initial) => ({ current: initial })",
+  formCode.replace(/^import .*;$/gm, "").replace("export default ", "") + "\nreturn PipelineForm;");
+function formHarness(apiClient) {
+  const hooks = [];
+  let cursor = 0;
+  const useState = (initial) => {
+    const index = cursor++;
+    if (!(index in hooks)) hooks[index] = typeof initial === "function" ? initial() : initial;
+    return [hooks[index], (next) => { hooks[index] = typeof next === "function" ? next(hooks[index]) : next; }];
+  };
+  const useRef = (initial) => {
+    const index = cursor++;
+    if (!(index in hooks)) hooks[index] = { current: initial };
+    return hooks[index];
+  };
+  const component = createForm(useState, () => {}, () => ({ showSuccess: () => {} }), apiClient, jsx, jsxs, useRef);
+  return () => { cursor = 0; return component({ canDelete: true, onClose: () => {} }); };
+}
+test("Pipeline new stage keys stay attached through reorder/delete and are excluded from payload", async () => {
+  const calls = [];
+  const render = formHarness({ post: async (...args) => { calls.push(args); return { data: { id: 1 } }; } });
+  const rows = () => elements(render(), "div").filter((element) => element.key !== null);
+  elements(render(), "input")[0].props.onChange({ target: { value: "Sales" } });
+  elements(render(), "button").find((element) => element.props.children === "Szakasz hozzáadása").props.onClick();
+  const key = rows().at(-1).key;
+  elements(rows().at(-1), "input")[0].props.onChange({ target: { value: "Custom" } });
+  elements(rows().at(-1), "button")[0].props.onClick();
+  assert.equal(rows().at(-2).key, key, "Reorder must move the key with the stage");
+  elements(rows()[0], "button").at(-1).props.onClick();
+  assert.equal(rows().at(-2).key, key);
+  assert.equal(new Set(rows().map(({ key }) => key)).size, rows().length);
+  await elements(render(), "form")[0].props.onSubmit({ preventDefault: () => {} });
+  assert.equal(calls[0][1].stages.at(-2).name, "Custom");
+  assert.ok(calls[0][1].stages.every((stage) => Object.keys(stage).join() === "name"));
+});
+test("Pipeline rapid form saves send only one create before rerender", async () => {
+  const calls = [];
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const render = formHarness({ post: (...args) => { calls.push(args); return pending; } });
+  elements(render(), "input")[0].props.onChange({ target: { value: "Sales" } });
+  const submit = elements(render(), "form")[0].props.onSubmit;
+  const first = submit({ preventDefault: () => {} });
+  const second = submit({ preventDefault: () => {} });
+  release({ data: { id: 1 } }); await Promise.all([first, second]);
+  assert.equal(calls.length, 1);
 });
