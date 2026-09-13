@@ -1,0 +1,22 @@
+import express from "express";
+import controller from "../controllers/pipelineController.js";
+import authMiddleware from "../middleware/authMiddleware.js";
+import requireOrganization from "../middleware/requireOrganization.js";
+import requireModule from "../middleware/requireModule.js";
+import requirePermission from "../middleware/requirePermission.js";
+
+const router = express.Router();
+const leadAccess = [requireModule("LEADS"), requirePermission("LEADS_VIEW")];
+router.use(authMiddleware, requireOrganization, requireModule("PIPELINE"));
+router.get("/", requirePermission("PIPELINE_VIEW"), controller.list);
+router.get("/:id/board", requirePermission("PIPELINE_VIEW"), ...leadAccess, controller.board);
+router.get("/:id", requirePermission("PIPELINE_VIEW"), controller.show);
+router.post("/", requirePermission("PIPELINE_CREATE"), controller.create);
+router.patch("/:id", requirePermission("PIPELINE_EDIT"), controller.edit);
+router.delete("/:id", requirePermission("PIPELINE_DELETE"), controller.delete);
+router.post("/:id/stages", requirePermission("PIPELINE_EDIT"), controller.createStage);
+router.patch("/:id/stages/reorder", requirePermission("PIPELINE_EDIT"), controller.reorderStages);
+router.patch("/:id/stages/:stageId", requirePermission("PIPELINE_EDIT"), controller.editStage);
+router.delete("/:id/stages/:stageId", requirePermission("PIPELINE_DELETE"), controller.deleteStage);
+router.patch("/:id/leads/:leadId/stage", requirePermission("PIPELINE_EDIT"), ...leadAccess, controller.move);
+export default router;

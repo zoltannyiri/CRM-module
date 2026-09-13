@@ -66,6 +66,16 @@ test("dashboard is tenant, module and permission aware", async () => {
   assert.deepEqual(moduleDisabledActivityCall[1].where.entityType, { in: ["PARTNER", "CONTACT", "TASK"] });
 
   // Test: User with ACTIVITY_VIEW but no entity view permissions gets empty recentActivities without DB query
+  enabledModules = ["LEADS", "PIPELINE"];
+  permissions = ["LEADS_VIEW", "ACTIVITY_VIEW"];
+  calls.length = 0;
+  await getDashboard({ organizationId: 42, membership });
+  assert.deepEqual(calls.find(([name]) => name === "activity.findMany")[1].where.NOT, { action: "PIPELINE_STAGE_CHANGED" });
+  permissions.push("PIPELINE_VIEW");
+  calls.length = 0;
+  await getDashboard({ organizationId: 42, membership });
+  assert.equal(calls.find(([name]) => name === "activity.findMany")[1].where.NOT, undefined);
+
   calls.length = 0;
   enabledModules = ["PARTNERS", "PROJECTS", "TASKS"];
   permissions = ["ACTIVITY_VIEW"];
@@ -120,4 +130,3 @@ test("overdue task evaluation logic handles dates and statuses properly", () => 
   // Tomorrow dueDate -> NEM overdue
   assert.equal(evaluateOverdue({ status: "TODO", dueDate: new Date("2026-09-11T00:00:00.000Z") }), false);
 });
-

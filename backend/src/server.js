@@ -13,6 +13,7 @@ import activityRoutes from "./routes/activityRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
+import pipelineRoutes from "./routes/pipelineRoutes.js";
 import offerRoutes from "./routes/offerRoutes.js";
 
 const app = express();
@@ -47,6 +48,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/offers", offerRoutes);
 app.use("/api/leads", leadRoutes);
+app.use("/api/pipelines", pipelineRoutes);
 
 app.use((error, _req, res, _next) => {
   const candidateStatus = error?.statusCode ?? error?.status;

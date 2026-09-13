@@ -68,6 +68,13 @@ export function getAllowedActivityEntityTypes({ enabledModules = [], permissions
   return allowed;
 }
 
+export function canViewPipelineActivities({ enabledModules = [], permissions = [] } = {}) {
+  const modules = new Set(enabledModules);
+  const perms = new Set(permissions);
+  return ["PIPELINE", "LEADS"].every((key) => modules.has(key)) &&
+    ["ACTIVITY_VIEW", "PIPELINE_VIEW", "LEADS_VIEW"].every((key) => perms.has(key));
+}
+
 /**
  * Creates an activity log entry.
  * Can be called with a Prisma transaction client (tx) or defaults to the global prisma instance.
@@ -122,15 +129,15 @@ async function getActivities(
   client = prisma,
 ) {
   let effectiveAllowedTypes = allowedEntityTypes;
-  if (!effectiveAllowedTypes && membership) {
-    const [enabledModules, effectivePermissions] = await Promise.all([
+  let pipelineActivitiesAllowed = false;
+  // Pipeline moves expose both domains. Filter them in the DB before applying limit.
+  if (membership) {
+    const [modules, permissions] = await Promise.all([
       getEnabledModules(organizationId, client),
       getEffectivePermissions(membership, client),
     ]);
-    effectiveAllowedTypes = getAllowedActivityEntityTypes({
-      enabledModules,
-      permissions: effectivePermissions,
-    });
+    pipelineActivitiesAllowed = canViewPipelineActivities({ enabledModules: modules, permissions });
+    if (!effectiveAllowedTypes) effectiveAllowedTypes = getAllowedActivityEntityTypes({ enabledModules: modules, permissions });
   }
 
   if (effectiveAllowedTypes) {
@@ -147,6 +154,7 @@ async function getActivities(
   return client.activity.findMany({
     where: {
       organizationId,
+      ...(!pipelineActivitiesAllowed && { NOT: { action: "PIPELINE_STAGE_CHANGED" } }),
       ...(entityType
         ? { entityType }
         : effectiveAllowedTypes

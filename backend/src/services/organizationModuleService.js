@@ -1,5 +1,6 @@
 import { ModuleKey } from "@prisma/client";
 import prisma from "../lib/prisma.js";
+import { initializeDefaultPipeline } from "./pipelineInitializationService.js";
 
 export const MODULE_KEYS = Object.freeze(Object.values(ModuleKey));
 
@@ -10,6 +11,7 @@ export const DEFAULT_ORGANIZATION_MODULES = Object.freeze([
   "DOCUMENTS",
   "OFFERS",
   "LEADS",
+  "PIPELINE",
 ]);
 
 const moduleKeySet = new Set(MODULE_KEYS);
@@ -50,6 +52,7 @@ export async function initializeOrganizationModules(
     data: moduleKeys.map((module) => ({ organizationId, module, enabled: true })),
     skipDuplicates: true,
   });
+  if (moduleKeys.includes("PIPELINE")) await initializeDefaultPipeline(organizationId, client);
 }
 
 export default {

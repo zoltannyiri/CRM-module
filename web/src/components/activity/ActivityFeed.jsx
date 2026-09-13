@@ -27,6 +27,7 @@ const actionLabels = {
   STATUS_CHANGED: "Státusz módosítva",
   ASSIGNED: "Felelős módosítva",
   PRIORITY_CHANGED: "Prioritás módosítva",
+  PIPELINE_STAGE_CHANGED: "Pipeline szakasz módosítva",
 };
 
 const actionClasses = {
@@ -36,6 +37,7 @@ const actionClasses = {
   STATUS_CHANGED: "border-[#e8ddc5] bg-[#faf6ec] text-[#816d40]",
   ASSIGNED: "border-[#dad6e8] bg-[#f5f3fa] text-[#5f518a]",
   PRIORITY_CHANGED: "border-[#eadcc5] bg-[#faf4ec] text-[#8a6a3b]",
+  PIPELINE_STAGE_CHANGED: "border-[#cfe3d1] bg-[#eff7ef] text-[#4d7853]",
 };
 
 const valueLabels = {
@@ -135,6 +137,7 @@ function getDateGroupKey(dateString) {
 function renderMetadata(activity) {
   const { action, metadata } = activity;
   if (!metadata || typeof metadata !== "object") return null;
+  if (action === "PIPELINE_STAGE_CHANGED") return <div className="mt-2 text-xs text-[#606d71]">{metadata.pipelineName}: {metadata.fromStageName || "Nincs szakaszhoz rendelve"} → {metadata.toStageName || "Nincs szakaszhoz rendelve"}</div>;
 
   if (action === "STATUS_CHANGED") {
     const oldVal = activityValueLabel(activity, metadata.oldValue);

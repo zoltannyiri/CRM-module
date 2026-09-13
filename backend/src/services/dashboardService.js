@@ -1,7 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { getEnabledModules } from "./organizationModuleService.js";
 import { getEffectivePermissions } from "./permissionService.js";
-import { getAllowedActivityEntityTypes } from "./activityService.js";
+import { getAllowedActivityEntityTypes, canViewPipelineActivities } from "./activityService.js";
 
 const OPEN_TASK_STATUSES = ["TODO", "IN_PROGRESS", "BLOCKED"];
 const UPCOMING_PROJECT_STATUSES = ["PLANNED", "ACTIVE", "ON_HOLD"];
@@ -61,6 +61,7 @@ export async function getDashboard({ organizationId, membership, now = new Date(
       where: {
         organizationId,
         entityType: { in: allowedActivityEntityTypes },
+        ...(!canViewPipelineActivities({ enabledModules, permissions: effectivePermissions }) && { NOT: { action: "PIPELINE_STAGE_CHANGED" } }),
       },
       select: {
         id: true, entityType: true, entityId: true, action: true, title: true, description: true, createdAt: true,

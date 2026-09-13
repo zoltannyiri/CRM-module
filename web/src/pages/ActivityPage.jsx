@@ -46,6 +46,7 @@ export default function ActivityPage() {
             <option value="TASK">Feladat</option>
             <option value="DOCUMENT">Dokumentum</option>
             <option value="OFFER">Ajánlat</option>
+            <option value="LEAD">Érdeklődő</option>
           </select>
 
           {/* Művelet */}
@@ -62,6 +63,7 @@ export default function ActivityPage() {
             <option value="STATUS_CHANGED">Státusz módosítva</option>
             <option value="ASSIGNED">Felelős módosítva</option>
             <option value="PRIORITY_CHANGED">Prioritás módosítva</option>
+            <option value="PIPELINE_STAGE_CHANGED">Pipeline szakasz módosítva</option>
           </select>
 
           {/* Végrehajtó / Felhasználó */}

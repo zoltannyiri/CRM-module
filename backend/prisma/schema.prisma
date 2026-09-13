@@ -57,6 +57,7 @@ enum ActivityAction {
   STATUS_CHANGED
   ASSIGNED
   PRIORITY_CHANGED
+  PIPELINE_STAGE_CHANGED
 }
 
 enum ModuleKey {
@@ -110,6 +111,11 @@ enum PermissionKey {
   LEADS_EDIT
   LEADS_DELETE
 
+  PIPELINE_VIEW
+  PIPELINE_CREATE
+  PIPELINE_EDIT
+  PIPELINE_DELETE
+
   ACTIVITY_VIEW
 }
 
@@ -143,6 +149,8 @@ model Organization {
   offers      Offer[]
   offerSequences OfferSequence[]
   leads       Lead[]
+  pipelines   Pipeline[]
+  pipelinePositions LeadPipelinePosition[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -484,6 +492,7 @@ model Lead {
   assignedMember OrganizationMember? @relation("LeadAssignee", fields: [assignedMemberId], references: [id], onDelete: SetNull)
   createdByMemberId Int?
   createdByMember OrganizationMember? @relation("LeadCreator", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  pipelinePosition LeadPipelinePosition?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -491,6 +500,56 @@ model Lead {
   @@index([organizationId, status])
   @@index([organizationId, source])
   @@index([organizationId, assignedMemberId])
+  @@unique([id, organizationId])
   @@index([assignedMemberId])
   @@index([createdByMemberId])
+}
+
+model Pipeline {
+  id Int @id @default(autoincrement())
+  organizationId Int
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name String
+  isDefault Boolean @default(false)
+  stages PipelineStage[]
+  leadPositions LeadPipelinePosition[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+model PipelineStage {
+  id Int @id @default(autoincrement())
+  organizationId Int
+  pipelineId Int
+  pipeline Pipeline @relation(fields: [pipelineId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  name String
+  position Int
+  leadPositions LeadPipelinePosition[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, pipelineId, organizationId])
+  @@unique([pipelineId, position])
+  @@index([organizationId])
+}
+
+model LeadPipelinePosition {
+  id Int @id @default(autoincrement())
+  organizationId Int
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leadId Int @unique
+  lead Lead @relation(fields: [leadId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  pipelineId Int
+  pipeline Pipeline @relation(fields: [pipelineId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  pipelineStageId Int
+  pipelineStage PipelineStage @relation(fields: [pipelineStageId, pipelineId, organizationId], references: [id, pipelineId, organizationId], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, pipelineId])
+  @@unique([leadId, organizationId])
+  @@index([pipelineStageId, pipelineId, organizationId])
 }

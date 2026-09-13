@@ -26,7 +26,7 @@ function Icon({ name, className = "", size = "size-[19px]" }) {
 
 const navigation = [
   { id: "dashboard", label: "Dashboard", route: "/dashboard" },
-  { id: "pipeline", label: "Értékesítés", children: ["Folyamatok", "Lehetőségek"] },
+  { id: "pipeline", label: "Pipeline", module: "PIPELINE", permission: "PIPELINE_VIEW", route: "/pipeline" },
   { id: "contacts", label: "Partnerek", module: "PARTNERS", permission: "PARTNERS_VIEW", children: ["Összes partner", "Kapcsolattartók"] },
   { id: "projects", label: "Projektek", module: "PROJECTS", permission: "PROJECTS_VIEW", route: "/project" },
   { id: "documents", label: "Dokumentumok", module: "DOCUMENTS", permission: "DOCUMENTS_VIEW", route: "/document" },
@@ -46,6 +46,7 @@ const childRoutes = {
 
 const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/dashboard")) return "dashboard";
+  if (pathname.startsWith("/pipeline")) return "pipeline";
   if (pathname.startsWith("/contact")) return "contacts-1";
   if (pathname.startsWith("/partner")) return "contacts-0";
   if (pathname.startsWith("/project")) return "projects";
@@ -103,6 +104,7 @@ export default function Sidebar() {
       <nav id="sidebar-navigation" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-[22px] [scrollbar-width:thin]" aria-label="Fő navigáció">
         <ul className="m-0 grid list-none gap-[5px] p-0">
           {navigation.filter((item) => {
+            if (item.id === "pipeline" && (!hasModule("LEADS") || !hasPermission("LEADS_VIEW"))) return false;
             if (item.module && !hasModule(item.module)) return false;
             if (item.permission && !hasPermission(item.permission)) return false;
             if (item.adminOnly && user?.role !== "OWNER" && user?.role !== "ADMIN") return false;
