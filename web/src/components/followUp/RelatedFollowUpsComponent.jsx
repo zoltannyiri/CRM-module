@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/apiClient.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useToast } from "../../hooks/useToast.js";
@@ -7,6 +8,7 @@ import FollowUpListComponent from "./FollowUpListComponent.jsx";
 import FollowUpFormComponent from "./FollowUpFormComponent.jsx";
 
 export default function RelatedFollowUpsComponent({ leadId, filters = {}, showTitle = true }) {
+  const navigate = useNavigate();
   const { hasModule, hasPermission } = useAuth();
   const access = followUpAccess(hasModule, hasPermission);
   const { showError } = useToast();
@@ -23,7 +25,7 @@ export default function RelatedFollowUpsComponent({ leadId, filters = {}, showTi
   if (!access.view) return null;
   return <section>
     {(showTitle || access.create) && <div className="mb-4 flex flex-wrap items-center justify-between gap-3">{showTitle ? <h2 className="text-base font-semibold text-[#29383d]">Utánkövetések</h2> : <span />}{access.create && <button type="button" onClick={() => { openRequest.current++; setForm({ mode: "create", leadId }); }} className="h-9 cursor-pointer rounded-md bg-[#263b40] px-4 text-xs font-semibold text-white">Új utánkövetés</button>}</div>}
-    <FollowUpListComponent filters={{ ...filters, ...(leadId && { leadId }) }} reloadKey={reloadKey} onView={(item) => open(item, "view")} onEdit={access.edit ? (item) => open(item, "edit") : undefined} onChanged={() => setReloadKey((value) => value + 1)} />
+    <FollowUpListComponent filters={{ ...filters, ...(leadId && { leadId }) }} reloadKey={reloadKey} onView={(item) => navigate(`/follow-up/${item.id}`)} onEdit={access.edit ? (item) => open(item, "edit") : undefined} onChanged={() => setReloadKey((value) => value + 1)} />
     {form && <FollowUpFormComponent {...form} onClose={() => { openRequest.current++; setForm(null); }} onSaved={() => setReloadKey((value) => value + 1)} />}
   </section>;
 }

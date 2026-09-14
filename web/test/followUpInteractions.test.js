@@ -37,13 +37,23 @@ test("Follow-up form preserves exact unchanged dueAt and sends one save during p
   assert.deepEqual(calls[0][2], { skipGlobalErrorToast: true });
   release({ data: fixture }); await Promise.all([first, duplicate]);
 });
-test("Follow-up form reports API errors inline and view mode cannot save", async () => {
+test("Follow-up edit form reports API errors inline", async () => {
   const render = harness({ patch: async () => { throw { response: { data: { message: "Rejected" } } }; } });
   await elements(render(), "form")[0].props.onSubmit({ preventDefault: () => {} });
   assert.equal(elements(render(), "p").find((element) => element.props.role === "alert").props.children, "Rejected");
-  const view = harness({ patch: () => assert.fail("View must not write") }, "view");
-  await elements(view(), "form")[0].props.onSubmit({ preventDefault: () => {} });
-  assert.equal(elements(view(), "fieldset")[0].props.disabled, true);
+});
+
+test("Follow-up create still posts an OPEN-default payload and rejects view as a form mode", async () => {
+  const calls = [];
+  const render = harness({ post: async (...args) => { calls.push(args); return { data: fixture }; } }, "create");
+  await elements(render(), "form")[0].props.onSubmit({ preventDefault: () => {} });
+  assert.equal(calls[0][0], "/follow-ups");
+  assert.equal(calls[0][1].leadId, 1);
+  assert.equal(Object.hasOwn(calls[0][1], "status"), false);
+  const wrapper = new Function("useAuth", "followUpAccess", "_jsx", "_jsxs",
+    code.replace(/^import .*;$/gm, "").replace("export default ", "") + "\nreturn FollowUpFormComponent;")(
+    () => ({ hasModule: () => true, hasPermission: () => true }), followUpAccess, jsx, jsxs);
+  assert.equal(wrapper({ mode: "view" }), null);
 });
 
 const listSource = await readFile(new URL("../src/components/followUp/FollowUpListComponent.jsx", import.meta.url), "utf8");
@@ -83,13 +93,13 @@ test("Follow-up drawer ignores a previous detail request that resolves after the
   let cursor = 0;
   const state = (initial) => { const index = cursor++; if (!(index in hooks)) hooks[index] = initial; return [hooks[index], (next) => { hooks[index] = typeof next === "function" ? next(hooks[index]) : next; }]; };
   const ref = (initial) => { const index = cursor++; if (!(index in hooks)) hooks[index] = { current: initial }; return hooks[index]; };
-  const component = new Function("useState", "useRef", "useAuth", "useToast", "apiClient", "followUpAccess", "FollowUpListComponent", "FollowUpFormComponent", "_jsx", "_jsxs",
+  const component = new Function("useState", "useRef", "useAuth", "useToast", "apiClient", "followUpAccess", "FollowUpListComponent", "FollowUpFormComponent", "_jsx", "_jsxs", "useNavigate",
     relatedCode.replace(/^import .*;$/gm, "").replace("export default ", "") + "\nreturn RelatedFollowUpsComponent;")(
     state, ref, () => ({ hasModule: () => true, hasPermission: () => true }), () => ({ showError: () => {} }),
-    { get: () => new Promise((resolve) => requests.push(resolve)) }, followUpAccess, "list", "drawer", jsx, jsxs);
+    { get: () => new Promise((resolve) => requests.push(resolve)) }, followUpAccess, "list", "drawer", jsx, jsxs, () => () => {});
   const render = () => { cursor = 0; return component({ leadId: 1 }); };
   const list = elements(render(), "list")[0];
-  const first = list.props.onView({ id: 10 }); const second = list.props.onView({ id: 20 });
+  const first = list.props.onEdit({ id: 10 }); const second = list.props.onEdit({ id: 20 });
   requests[1]({ data: { id: 20 } }); await second;
   requests[0]({ data: { id: 10 } }); await first;
   assert.equal(elements(render(), "drawer")[0].props.followUp.id, 20);

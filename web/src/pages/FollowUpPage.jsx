@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import apiClient from "../api/apiClient.js";
 import Topbar from "../components/Topbar.jsx";
 import RelatedFollowUpsComponent from "../components/followUp/RelatedFollowUpsComponent.jsx";
+import FollowUpShowComponent from "../components/followUp/FollowUpShowComponent.jsx";
+import FollowUpFormComponent from "../components/followUp/FollowUpFormComponent.jsx";
 import { followUpPeriods, followUpStatusLabels, followUpTypeLabels } from "../components/followUp/followUpDisplay.js";
 import { memberName } from "../components/lead/leadDisplay.js";
 const control = "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-3 text-xs text-[#344247] outline-none";
 export default function FollowUpPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [form, setForm] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState("TODAY");
   const [type, setType] = useState("");
@@ -14,10 +21,17 @@ export default function FollowUpPage() {
   const [sort, setSort] = useState("");
   const [members, setMembers] = useState([]);
   useEffect(() => {
+    if (id) return undefined;
     let active = true;
     apiClient.get("/members", { skipGlobalErrorToast: true }).then(({ data }) => { if (active) setMembers(data); }).catch(() => {});
     return () => { active = false; };
-  }, []);
+  }, [id]);
+  if (id) return <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
+    <Topbar />
+    <div className="flex flex-wrap items-center gap-3 border-b border-[#e3e8e6] bg-white px-5 py-3 lg:px-7"><button type="button" onClick={() => navigate("/follow-up")} className={control}>Vissza az utánkövetésekhez</button><span className="h-4 w-px bg-[#dbe1df]" /><h1 className="text-sm font-semibold">Utánkövetés adatlap</h1></div>
+    <main className="px-5 py-6 lg:px-7"><FollowUpShowComponent key={id} followUpId={id} reloadKey={reloadKey} onEdit={(followUp) => setForm({ followUp, mode: "edit" })} /></main>
+    {form && String(form.followUp.id) === id && <FollowUpFormComponent key={form.followUp.id} {...form} onClose={() => setForm(null)} onSaved={() => setReloadKey((value) => value + 1)} />}
+  </div>;
   return <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
     <Topbar searchValue={query} onSearchChange={setQuery} />
     <div className="border-b border-[#e3e8e6] bg-white px-5 py-4 lg:px-7"><h1 className="mb-4 text-lg font-semibold">Utánkövetések</h1><div className="flex flex-wrap gap-2">
