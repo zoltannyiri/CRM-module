@@ -47,6 +47,7 @@ export default function ActivityPage() {
             <option value="DOCUMENT">Dokumentum</option>
             <option value="OFFER">Ajánlat</option>
             <option value="LEAD">Érdeklődő</option>
+            <option value="FOLLOW_UP">Utánkövetés</option>
           </select>
 
           {/* Művelet */}
@@ -58,6 +59,7 @@ export default function ActivityPage() {
           >
             <option value="">Minden művelet</option>
             <option value="CREATED">Létrehozva</option>
+            <option value="FOLLOW_UP_COMPLETED">Teljesítve</option>
             <option value="UPDATED">Módosítva</option>
             <option value="DELETED">Törölve</option>
             <option value="STATUS_CHANGED">Státusz módosítva</option>

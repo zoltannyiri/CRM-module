@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth.js";
 const icons = {
   dashboard: <><path d="M10 3a9 9 0 1 0 11 11H10Z" /><path d="M14 2v8h8a9 9 0 0 0-8-8Z" /></>,
   pipeline: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M9 9v11M15 9v11" /></>,
+  "follow-up": <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   contacts: <><circle cx="9" cy="7" r="3" /><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3" /></>,
   products: <path d="M3 7V5a2 2 0 0 1 2-2h5l3 4h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />,
   projects: <><path d="M4 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12h20" /></>,
@@ -27,6 +28,7 @@ function Icon({ name, className = "", size = "size-[19px]" }) {
 const navigation = [
   { id: "dashboard", label: "Dashboard", route: "/dashboard" },
   { id: "pipeline", label: "Pipeline", module: "PIPELINE", permission: "PIPELINE_VIEW", route: "/pipeline" },
+  { id: "follow-up", label: "Utánkövetések", module: "FOLLOW_UPS", permission: "FOLLOW_UPS_VIEW", route: "/follow-up" },
   { id: "contacts", label: "Partnerek", module: "PARTNERS", permission: "PARTNERS_VIEW", children: ["Összes partner", "Kapcsolattartók"] },
   { id: "projects", label: "Projektek", module: "PROJECTS", permission: "PROJECTS_VIEW", route: "/project" },
   { id: "documents", label: "Dokumentumok", module: "DOCUMENTS", permission: "DOCUMENTS_VIEW", route: "/document" },
@@ -47,6 +49,7 @@ const childRoutes = {
 const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/dashboard")) return "dashboard";
   if (pathname.startsWith("/pipeline")) return "pipeline";
+  if (pathname.startsWith("/follow-up")) return "follow-up";
   if (pathname.startsWith("/contact")) return "contacts-1";
   if (pathname.startsWith("/partner")) return "contacts-0";
   if (pathname.startsWith("/project")) return "projects";
@@ -105,6 +108,7 @@ export default function Sidebar() {
         <ul className="m-0 grid list-none gap-[5px] p-0">
           {navigation.filter((item) => {
             if (item.id === "pipeline" && (!hasModule("LEADS") || !hasPermission("LEADS_VIEW"))) return false;
+            if (item.id === "follow-up" && (!hasModule("LEADS") || !hasPermission("LEADS_VIEW"))) return false;
             if (item.module && !hasModule(item.module)) return false;
             if (item.permission && !hasPermission(item.permission)) return false;
             if (item.adminOnly && user?.role !== "OWNER" && user?.role !== "ADMIN") return false;

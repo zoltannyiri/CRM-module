@@ -8,6 +8,7 @@ const entityLabels = {
   DOCUMENT: "Dokumentum",
   OFFER: "Ajánlat",
   LEAD: "Érdeklődő",
+  FOLLOW_UP: "Utánkövetés",
 };
 
 const entityClasses = {
@@ -17,6 +18,7 @@ const entityClasses = {
   TASK: "border-[#e0dce8] bg-[#f4f1f9] text-[#5e4b77]",
   DOCUMENT: "border-[#d8e2e6] bg-[#f0f4f7] text-[#446574]",
   LEAD: "border-[#d0ded5] bg-[#edf4f0] text-[#3e684a]",
+  FOLLOW_UP: "border-[#d0ded5] bg-[#edf4f0] text-[#3e684a]",
   OFFER: "border-[#e8ddc5] bg-[#faf6ec] text-[#816d40]",
 };
 
@@ -28,6 +30,7 @@ const actionLabels = {
   ASSIGNED: "Felelős módosítva",
   PRIORITY_CHANGED: "Prioritás módosítva",
   PIPELINE_STAGE_CHANGED: "Pipeline szakasz módosítva",
+  FOLLOW_UP_COMPLETED: "Teljesítve",
 };
 
 const actionClasses = {
@@ -38,6 +41,7 @@ const actionClasses = {
   ASSIGNED: "border-[#dad6e8] bg-[#f5f3fa] text-[#5f518a]",
   PRIORITY_CHANGED: "border-[#eadcc5] bg-[#faf4ec] text-[#8a6a3b]",
   PIPELINE_STAGE_CHANGED: "border-[#cfe3d1] bg-[#eff7ef] text-[#4d7853]",
+  FOLLOW_UP_COMPLETED: "border-[#cfe3d1] bg-[#eff7ef] text-[#4d7853]",
 };
 
 const valueLabels = {
@@ -76,6 +80,7 @@ function activityValueLabel(activity, value) {
 }
 
 const fieldLabels = {
+  dueAt: "Időpont",
   name: "Név",
   companyName: "Cégnév",
   source: "Forrás",

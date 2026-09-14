@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
 
 const groups = [
+  { title: "Utánkövetések", module: "FOLLOW_UPS", permissions: [["FOLLOW_UPS_VIEW", "Megtekintés"], ["FOLLOW_UPS_CREATE", "Létrehozás"], ["FOLLOW_UPS_EDIT", "Szerkesztés"], ["FOLLOW_UPS_DELETE", "Törlés"], ["FOLLOW_UPS_COMPLETE", "Teljesítés"]] },
   { title: "Pipeline", module: "PIPELINE", permissions: [["PIPELINE_VIEW", "Megtekintés"], ["PIPELINE_CREATE", "Létrehozás"], ["PIPELINE_EDIT", "Szerkesztés"], ["PIPELINE_DELETE", "Törlés"]] },
   { title: "Érdeklődők", module: "LEADS", permissions: [["LEADS_VIEW", "Megtekintés"], ["LEADS_CREATE", "Létrehozás"], ["LEADS_EDIT", "Módosítás"], ["LEADS_DELETE", "Törlés"]] },
   { title: "Partnerek", module: "PARTNERS", permissions: [["PARTNERS_VIEW", "Megtekintés"], ["PARTNERS_CREATE", "Létrehozás"], ["PARTNERS_EDIT", "Módosítás"], ["PARTNERS_DELETE", "Törlés"]] },

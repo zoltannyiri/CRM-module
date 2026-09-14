@@ -6,10 +6,11 @@ import { transformWithOxc } from "vite";
 import { jsx, jsxs } from "react/jsx-runtime";
 import { boardColumns, pipelineAccess } from "../src/components/pipeline/pipelineDisplay.js";
 import { leadSourceLabels, leadStatusLabels, memberName } from "../src/components/lead/leadDisplay.js";
+import { formatFollowUpTime } from "../src/components/followUp/followUpDisplay.js";
 
 const source = await readFile(new URL("../src/components/pipeline/PipelineBoardComponent.jsx", import.meta.url), "utf8");
 const { code } = await transformWithOxc(source, "PipelineBoardComponent.jsx", { jsx: { runtime: "automatic" } });
-const createBoard = new Function("useState", "Link", "boardColumns", "leadSourceLabels", "leadStatusLabels", "memberName", "_jsx", "_jsxs",
+const createBoard = new Function("useState", "Link", "boardColumns", "leadSourceLabels", "leadStatusLabels", "memberName", "_jsx", "_jsxs", "formatFollowUpTime",
   code.replace(/^import .*;$/gm, "").replace("export default ", "") + "\nreturn PipelineBoardComponent;");
 const fixture = { pipeline: { id: 1, name: "Sales" }, stages: [{ id: 10, name: "First", position: 1, leads: [] }, { id: 20, name: "Second", position: 2, leads: [] }], unassignedLeads: [{ id: 42, name: "Lead", status: "NEW", source: "OTHER", assignedMember: null }] };
 
@@ -20,7 +21,7 @@ function elements(node, type) {
 }
 function boardHarness(props) {
   let dragged = null;
-  const component = createBoard(() => [dragged, (value) => { dragged = value; }], "a", boardColumns, leadSourceLabels, leadStatusLabels, memberName, jsx, jsxs);
+  const component = createBoard(() => [dragged, (value) => { dragged = value; }], "a", boardColumns, leadSourceLabels, leadStatusLabels, memberName, jsx, jsxs, formatFollowUpTime);
   return () => component({ board: fixture, canEdit: true, moving: false, ...props });
 }
 test("Pipeline desktop drag/drop invokes the explicit move with the target stage", () => {
@@ -54,6 +55,14 @@ test("Pipeline viewers cannot drag; pending requests disable the alternative", (
   const pending = boardHarness({ moving: true })();
   assert.equal(elements(pending, "article")[0].props.draggable, false);
   assert.equal(elements(pending, "select")[0].props.disabled, true);
+});
+test("Pipeline next Follow-up card line is hidden without its view access", () => {
+  const board = { ...fixture, unassignedLeads: [{ ...fixture.unassignedLeads[0], nextFollowUp: { dueAt: "2030-01-01T10:00Z" } }] };
+  const hidden = boardHarness({ board, canViewFollowUps: false })();
+  const visible = boardHarness({ board, canViewFollowUps: true })();
+  const followUpLine = (element) => Array.isArray(element.props.children) && ["Következő", "Lejárt"].includes(element.props.children[0]);
+  assert.equal(elements(hidden, "p").filter(followUpLine).length, 0);
+  assert.equal(elements(visible, "p").filter(followUpLine).length, 1);
 });
 
 // Exercise the actual page request handler before its JSX, matching the existing

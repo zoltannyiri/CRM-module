@@ -3,12 +3,28 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// Migrations need a stable database connection. Keep the application's pooled
+// DATABASE_URL, but use an explicit direct URL (or Neon's matching direct host)
+// for the Prisma CLI.
+function migrationUrl() {
+  if (process.env.DIRECT_URL) return process.env.DIRECT_URL;
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) return databaseUrl;
+  const url = new URL(databaseUrl);
+  if (url.hostname.endsWith(".neon.tech") && url.hostname.includes("-pooler.")) {
+    url.hostname = url.hostname.replace("-pooler.", ".");
+    url.searchParams.delete("pgbouncer");
+    return url.toString();
+  }
+  return databaseUrl;
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: migrationUrl(),
   },
 });

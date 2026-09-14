@@ -37,12 +37,16 @@ export async function getBoard(args, client = prisma) {
         ],
         ...(args.assignedMemberId !== undefined && { assignedMemberId: args.assignedMemberId }),
       },
-      select: cardSelect, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { ...cardSelect, ...(args.canViewFollowUps && { followUps: {
+        where: { organizationId: args.organizationId, status: "OPEN" }, select: { dueAt: true },
+        orderBy: [{ dueAt: "asc" }, { id: "asc" }], take: 1,
+      } }) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
     const stages = pipeline.stages.map((stage) => ({ ...stage, leads: [] }));
     const byId = new Map(stages.map((stage) => [stage.id, stage]));
     const unassignedLeads = [];
-    for (const { pipelinePosition, ...lead } of leads) {
+    for (const { pipelinePosition, followUps, ...lead } of leads) {
+      if (args.canViewFollowUps) lead.nextFollowUp = followUps?.[0] || null;
       if (!pipelinePosition) unassignedLeads.push(lead);
       else byId.get(pipelinePosition.pipelineStageId)?.leads.push(lead);
     }

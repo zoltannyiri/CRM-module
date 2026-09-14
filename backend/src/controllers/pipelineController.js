@@ -1,5 +1,6 @@
 import service from "../services/pipelineService.js";
 import { hasPermission } from "../services/permissionService.js";
+import { isModuleEnabled } from "../services/organizationModuleService.js";
 
 const validId = (value) => typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 2147483647;
 export function parseId(value) {
@@ -72,7 +73,8 @@ async function handle(req, res, next, operation) {
         args.assignedMemberId = parseId(req.query.assignedMemberId);
         if (!args.assignedMemberId) return res.status(400).json({ message: "Érvénytelen felelős szűrő." });
       }
-      result = await service.getBoard({ ...args, search: req.query.search });
+      const canViewFollowUps = await isModuleEnabled(args.organizationId, "FOLLOW_UPS") && await hasPermission(req.membership, "FOLLOW_UPS_VIEW");
+      result = await service.getBoard({ ...args, search: req.query.search, canViewFollowUps });
     }
     if (operation === "create" || operation === "edit") {
       const normalized = normalizePipeline(req.body, operation === "edit");

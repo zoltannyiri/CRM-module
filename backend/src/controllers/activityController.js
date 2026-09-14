@@ -1,6 +1,6 @@
 import activityService from "../services/activityService.js";
 
-const VALID_ENTITY_TYPES = new Set(["PARTNER", "CONTACT", "PROJECT", "TASK", "DOCUMENT", "OFFER", "LEAD"]);
+const VALID_ENTITY_TYPES = new Set(["PARTNER", "CONTACT", "PROJECT", "TASK", "DOCUMENT", "OFFER", "LEAD", "FOLLOW_UP"]);
 const VALID_ACTIONS = new Set([
   "CREATED",
   "UPDATED",
@@ -9,6 +9,7 @@ const VALID_ACTIONS = new Set([
   "ASSIGNED",
   "PRIORITY_CHANGED",
   "PIPELINE_STAGE_CHANGED",
+  "FOLLOW_UP_COMPLETED",
 ]);
 
 function parsePositiveId(value) {

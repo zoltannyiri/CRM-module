@@ -29,7 +29,7 @@ test("Pipeline migration deploy upgrades pre-Pipeline data without resetting cus
     const source = path.resolve("prisma/migrations");
     const migrations = path.join(directory, "migrations");
     for (const name of (await readdir(source)).sort()) {
-      if (name !== migrationName) await cp(path.join(source, name), path.join(migrations, name), { recursive: true });
+      if (name < migrationName || name === "migration_lock.toml") await cp(path.join(source, name), path.join(migrations, name), { recursive: true });
     }
     const config = path.join(directory, "prisma.config.mjs");
     await writeFile(config, `export default { schema: ${JSON.stringify(path.resolve("prisma/schema.prisma"))}, migrations: { path: ${JSON.stringify(migrations)} }, datasource: { url: process.env.DATABASE_URL } };\n`);
@@ -50,7 +50,7 @@ test("Pipeline migration deploy upgrades pre-Pipeline data without resetting cus
     }
     await prisma.organizationMemberPermission.create({ data: { organizationMemberId: members[2].id, permission: "LEADS_VIEW" } });
     const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Existing Lead", status: "QUALIFIED", email: "preserve@example.invalid" } });
-    await cp(path.join(source, migrationName), path.join(migrations, migrationName), { recursive: true });
+    for (const name of (await readdir(source)).filter((name) => name >= migrationName && name !== "migration_lock.toml")) await cp(path.join(source, name), path.join(migrations, name), { recursive: true });
     assert.match((await deploy()).stdout, /20260913120000_add_pipeline/);
     assert.match((await deploy()).stdout, /No pending migrations/);
     const pipelines = await prisma.pipeline.findMany({ where: { organizationId: org.id }, include: { stages: { orderBy: { position: "asc" } } } });

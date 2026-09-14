@@ -12,6 +12,7 @@ export const DEFAULT_ORGANIZATION_MODULES = Object.freeze([
   "OFFERS",
   "LEADS",
   "PIPELINE",
+  "FOLLOW_UPS",
 ]);
 
 const moduleKeySet = new Set(MODULE_KEYS);

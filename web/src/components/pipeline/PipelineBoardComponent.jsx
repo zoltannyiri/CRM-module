@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { leadSourceLabels, leadStatusLabels, memberName } from "../lead/leadDisplay.js";
 import { boardColumns } from "./pipelineDisplay.js";
+import { formatFollowUpTime } from "../followUp/followUpDisplay.js";
 
-export default function PipelineBoardComponent({ board, canEdit, moving, onMove }) {
+export default function PipelineBoardComponent({ board, canEdit, moving, onMove, canViewFollowUps = false }) {
   const [draggedLead, setDraggedLead] = useState(null);
   const columns = boardColumns(board);
   return <div className="flex items-start gap-4 overflow-x-auto pb-5" aria-label="Pipeline board">
@@ -17,6 +18,7 @@ export default function PipelineBoardComponent({ board, canEdit, moving, onMove 
         className={`rounded-md border border-[#dbe1df] bg-white p-4 shadow-[0_1px_2px_rgba(24,39,43,.02)] ${moving ? "cursor-wait" : canEdit ? "cursor-grab active:cursor-grabbing" : ""}`}>
         <Link to={`/lead/${lead.id}`} draggable={false} className="cursor-pointer text-sm font-semibold break-words text-[#29383d] hover:underline">{lead.name}</Link>
         {lead.companyName && <p className="mt-1 text-xs break-words text-[#71807c]">{lead.companyName}</p>}
+        {canViewFollowUps && lead.nextFollowUp && <p className={`mt-2 text-[11px] ${new Date(lead.nextFollowUp.dueAt) < new Date() ? "text-[#a34b3d]" : "text-[#71807c]"}`}>{new Date(lead.nextFollowUp.dueAt) < new Date() ? "Lejárt" : "Következő"}: {formatFollowUpTime(lead.nextFollowUp.dueAt)}</p>}
         <dl className="mt-3 grid gap-1.5 text-[11px] text-[#71807c]"><div className="flex justify-between gap-2"><dt>Felelős</dt><dd className="text-right">{memberName(lead.assignedMember)}</dd></div><div className="flex justify-between gap-2"><dt>Forrás</dt><dd>{leadSourceLabels[lead.source]}</dd></div><div className="flex justify-between gap-2"><dt>Státusz</dt><dd>{leadStatusLabels[lead.status]}</dd></div></dl>
         {canEdit && <label className="mt-3 grid gap-1.5 border-t border-[#edf0ef] pt-3 text-[11px] text-[#71807c]">Szakasz módosítása<select value={column.id ?? ""} disabled={moving} onChange={(event) => onMove(lead.id, event.target.value ? Number(event.target.value) : null)} className="h-8 w-full cursor-pointer rounded-md border border-[#d7dedc] bg-white px-2 text-xs text-[#344247] outline-none disabled:cursor-wait disabled:opacity-60"><option value="">Nincs szakaszhoz rendelve</option>{board.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>}
       </article>)}</div>

@@ -48,6 +48,7 @@ enum ActivityEntityType {
   DOCUMENT
   OFFER
   LEAD
+  FOLLOW_UP
 }
 
 enum ActivityAction {
@@ -58,6 +59,7 @@ enum ActivityAction {
   ASSIGNED
   PRIORITY_CHANGED
   PIPELINE_STAGE_CHANGED
+  FOLLOW_UP_COMPLETED
 }
 
 enum ModuleKey {
@@ -116,6 +118,12 @@ enum PermissionKey {
   PIPELINE_EDIT
   PIPELINE_DELETE
 
+  FOLLOW_UPS_VIEW
+  FOLLOW_UPS_CREATE
+  FOLLOW_UPS_EDIT
+  FOLLOW_UPS_DELETE
+  FOLLOW_UPS_COMPLETE
+
   ACTIVITY_VIEW
 }
 
@@ -151,6 +159,7 @@ model Organization {
   leads       Lead[]
   pipelines   Pipeline[]
   pipelinePositions LeadPipelinePosition[]
+  followUps FollowUp[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -185,11 +194,14 @@ model OrganizationMember {
   createdOffers Offer[]
   assignedLeads Lead[] @relation("LeadAssignee")
   createdLeads Lead[] @relation("LeadCreator")
+  assignedFollowUps FollowUp[] @relation("FollowUpAssignee")
+  createdFollowUps FollowUp[] @relation("FollowUpCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([userId, organizationId])
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@index([userId])
 }
@@ -493,6 +505,7 @@ model Lead {
   createdByMemberId Int?
   createdByMember OrganizationMember? @relation("LeadCreator", fields: [createdByMemberId], references: [id], onDelete: SetNull)
   pipelinePosition LeadPipelinePosition?
+  followUps FollowUp[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -552,4 +565,42 @@ model LeadPipelinePosition {
   @@index([organizationId, pipelineId])
   @@unique([leadId, organizationId])
   @@index([pipelineStageId, pipelineId, organizationId])
+}
+
+enum FollowUpType {
+  CALL
+  EMAIL
+  MEETING
+  OTHER
+}
+
+enum FollowUpStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+model FollowUp {
+  id Int @id @default(autoincrement())
+  organizationId Int
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leadId Int
+  lead Lead @relation(fields: [leadId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  assignedMemberId Int?
+  assignedMember OrganizationMember? @relation("FollowUpAssignee", fields: [assignedMemberId, organizationId], references: [id, organizationId], onDelete: SetNull)
+  createdByMemberId Int?
+  createdByMember OrganizationMember? @relation("FollowUpCreator", fields: [createdByMemberId, organizationId], references: [id, organizationId], onDelete: SetNull)
+  type FollowUpType @default(OTHER)
+  status FollowUpStatus @default(OPEN)
+  dueAt DateTime @db.Timestamptz(3)
+  note String?
+  completedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([organizationId, status, dueAt])
+  @@index([organizationId, assignedMemberId, status, dueAt])
+  @@index([leadId, organizationId, status, dueAt])
+  @@index([assignedMemberId, organizationId])
+  @@index([createdByMemberId, organizationId])
 }

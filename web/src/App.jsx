@@ -17,6 +17,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import LeadPage from "./pages/LeadPage.jsx";
 import OfferPage from "./pages/OfferPage.jsx";
 import PipelinePage from "./pages/PipelinePage.jsx";
+import FollowUpPage from "./pages/FollowUpPage.jsx";
 
 function Workspace({ children }) {
   return (
@@ -91,6 +92,7 @@ function App() {
         />
         <Route path="/lead" element={<Workspace><ModuleRoute module="LEADS"><PermissionRoute permission="LEADS_VIEW"><LeadPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/pipeline" element={<Workspace><ModuleRoute module="PIPELINE"><PermissionRoute permission="PIPELINE_VIEW"><ModuleRoute module="LEADS"><PermissionRoute permission="LEADS_VIEW"><PipelinePage /></PermissionRoute></ModuleRoute></PermissionRoute></ModuleRoute></Workspace>} />
+        <Route path="/follow-up" element={<Workspace><ModuleRoute module="FOLLOW_UPS"><PermissionRoute permission="FOLLOW_UPS_VIEW"><ModuleRoute module="LEADS"><PermissionRoute permission="LEADS_VIEW"><FollowUpPage /></PermissionRoute></ModuleRoute></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/lead/:id" element={<Workspace><ModuleRoute module="LEADS"><PermissionRoute permission="LEADS_VIEW"><LeadPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/offer" element={<Workspace><ModuleRoute module="OFFERS"><PermissionRoute permission="OFFERS_VIEW"><OfferPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/offer/:id" element={<Workspace><ModuleRoute module="OFFERS"><PermissionRoute permission="OFFERS_VIEW"><OfferPage /></PermissionRoute></ModuleRoute></Workspace>} />

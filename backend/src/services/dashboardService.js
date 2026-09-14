@@ -2,6 +2,7 @@ import prisma from "../lib/prisma.js";
 import { getEnabledModules } from "./organizationModuleService.js";
 import { getEffectivePermissions } from "./permissionService.js";
 import { getAllowedActivityEntityTypes, canViewPipelineActivities } from "./activityService.js";
+import { canViewFollowUps, getMyFollowUpsSummary } from "./followUpService.js";
 
 const OPEN_TASK_STATUSES = ["TODO", "IN_PROGRESS", "BLOCKED"];
 const UPCOMING_PROJECT_STATUSES = ["PLANNED", "ACTIVE", "ON_HOLD"];
@@ -13,7 +14,7 @@ function utcDayWindow(now = new Date()) {
   return { start, endExclusive };
 }
 
-export async function getDashboard({ organizationId, membership, now = new Date() }) {
+export async function getDashboard({ organizationId, membership, timeZone, now = new Date() }) {
   const [enabledModules, effectivePermissions] = await Promise.all([
     getEnabledModules(organizationId),
     getEffectivePermissions(membership),
@@ -24,6 +25,7 @@ export async function getDashboard({ organizationId, membership, now = new Date(
   const canProjects = modules.has("PROJECTS") && permissions.has("PROJECTS_VIEW");
   const canTasks = modules.has("TASKS") && permissions.has("TASKS_VIEW");
   const canActivity = permissions.has("ACTIVITY_VIEW");
+  const canFollowUps = canViewFollowUps({ enabledModules, permissions: effectivePermissions });
   const { start, endExclusive } = utcDayWindow(now);
 
   const allowedActivityEntityTypes = getAllowedActivityEntityTypes({
@@ -31,7 +33,7 @@ export async function getDashboard({ organizationId, membership, now = new Date(
     permissions: effectivePermissions,
   });
 
-  const [partnerCount, activeProjectCount, openTaskCount, overdueTaskCount, myTasks, projectDeadlines, taskDeadlines, recentActivities] = await Promise.all([
+  const [partnerCount, activeProjectCount, openTaskCount, overdueTaskCount, myTasks, projectDeadlines, taskDeadlines, recentActivities, followUps] = await Promise.all([
     canPartners ? prisma.partner.count({ where: { organizationId } }) : null,
     canProjects ? prisma.project.count({ where: { organizationId, status: "ACTIVE" } }) : null,
     canTasks ? prisma.task.count({ where: { organizationId, status: { in: OPEN_TASK_STATUSES } } }) : null,
@@ -70,6 +72,7 @@ export async function getDashboard({ organizationId, membership, now = new Date(
       orderBy: { createdAt: "desc" },
       take: 8,
     }) : [],
+    canFollowUps ? getMyFollowUpsSummary({ organizationId, memberId: membership.id, timeZone, now }) : null,
   ]);
 
   const stats = [];
@@ -90,6 +93,7 @@ export async function getDashboard({ organizationId, membership, now = new Date(
     ...(canTasks && { myTasks: myTasks.map((task) => ({ ...task, project: canProjects ? task.project : null })) }),
     ...((canProjects || canTasks) && { upcomingDeadlines }),
     ...(canActivity && { recentActivities }),
+    ...(canFollowUps && { followUps }),
   };
 }
 
