@@ -122,10 +122,51 @@ test("Follow-up page renders direct detail from params without list or member re
   const component = await compile("../src/pages/FollowUpPage.jsx", "FollowUpPage", {
     useState: (s) => [s, () => {}], useEffect: (effect) => effects.push(effect), useParams: () => ({ id: "123" }), useNavigate: () => (url) => navigations.push(url),
     apiClient: { get: () => assert.fail("Detail page must leave loading to Show") }, Topbar: "topbar", RelatedFollowUpsComponent: "list", FollowUpShowComponent: "show", FollowUpFormComponent: "drawer",
+    useAuth: () => ({ hasPermission: () => true }), TabView: "tabs", TabPanel: "panel", FollowUpActivityComponent: "activity",
     followUpPeriods: {}, followUpStatusLabels, followUpTypeLabels, memberName, _jsx: jsx, _jsxs: jsxs,
   });
   const tree = component(); effects.forEach((effect) => effect());
   assert.equal(elements(tree, "show")[0].props.followUpId, "123");
   assert.equal(elements(tree, "list").length, 0);
+  assert.deepEqual(elements(tree, "panel").map((panel) => panel.props.header), ["Alapadatok", "Tevékenységek"]);
+  assert.equal(elements(tree, "tabs")[0].props.renderActiveOnly, true);
+  assert.equal(elements(tree, "activity")[0].props.followUpId, "123");
   elements(tree, "button")[0].props.onClick(); assert.deepEqual(navigations, ["/follow-up"]);
+});
+
+test("Follow-up tabs match Partner style and hide Activity without ACTIVITY_VIEW", async () => {
+  const component = await compile("../src/pages/FollowUpPage.jsx", "FollowUpPage", {
+    useState: (s) => [s, () => {}], useEffect: () => {}, useParams: () => ({ id: "123" }), useNavigate: () => () => {}, useAuth: () => ({ hasPermission: () => false }),
+    Topbar: "topbar", FollowUpShowComponent: "show", FollowUpFormComponent: "drawer", TabView: "tabs", TabPanel: "panel", FollowUpActivityComponent: "activity", _jsx: jsx, _jsxs: jsxs,
+  });
+  const tree = component();
+  assert.deepEqual(elements(tree, "panel").map((p) => p.props.header), ["Alapadatok"]);
+  const partner = await readFile(new URL("../src/pages/PartnerPage.jsx", import.meta.url), "utf8");
+  assert.equal(elements(tree, "tabs")[0].props.className, partner.match(/<TabView\s+className="([^"]+)"/)[1]);
+  assert.equal(elements(tree, "tabs")[0].key, "123");
+});
+
+test("Follow-up Activity uses scoped feed, reloads and handles loading/empty/error", async () => {
+  const hooks = [], effects = [], calls = []; let cursor = 0;
+  let response = [{ id: 1, entityType: "FOLLOW_UP", entityId: 123, action: "UPDATED" }];
+  const bindings = {
+    useState: (initial) => { const i = cursor++; if (!(i in hooks)) hooks[i] = initial; return [hooks[i], (v) => { hooks[i] = v; }]; },
+    useEffect: (effect) => effects.push(effect), ActivityFeed: "feed", _jsx: jsx, _jsxs: jsxs,
+    apiClient: { get: async (...args) => { calls.push(args); if (response instanceof Error) throw response; return { data: response }; } },
+  };
+  const component = await compile("../src/components/followUp/FollowUpActivityComponent.jsx", "FollowUpActivity", bindings);
+  const render = (reloadKey = 0) => { cursor = 0; return component({ followUpId: "123", reloadKey }); };
+  assert.equal(elements(render(), "feed")[0].props.loading, true);
+  effects.shift()(); await settle();
+  assert.deepEqual(calls[0], ["/activities", { params: { entityType: "FOLLOW_UP", entityId: "123", limit: 100 }, skipGlobalErrorToast: true }]);
+  assert.deepEqual(elements(render(), "feed")[0].props.activities, response);
+  effects.length = 0; response = []; render(1); effects.shift()(); await settle();
+  assert.equal(calls.length, 2); assert.equal(elements(render(1), "feed")[0].props.emptyMessage, "Nincs megjeleníthető tevékenység.");
+  assert.deepEqual(elements(render(1), "feed")[0].props.activities, []);
+  effects.length = 0; response = new Error("Internal Prisma secret"); render(2); effects.shift()(); await settle();
+  assert.equal(elements(render(2), "feed")[0].props.error, "A tevékenységek nem tölthetők be.");
+  for (const blocked of ["ACTIVITY_VIEW", "FOLLOW_UPS_VIEW", "LEADS_VIEW", "FOLLOW_UPS", "LEADS"]) {
+    const wrapper = await compile("../src/components/followUp/FollowUpActivityComponent.jsx", "FollowUpActivityComponent", { ...bindings, followUpAccess, useAuth: () => ({ hasPermission: (key) => key !== blocked, hasModule: (key) => key !== blocked }) });
+    assert.equal(wrapper({ followUpId: "123" }), null);
+  }
 });
