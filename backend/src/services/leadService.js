@@ -1,6 +1,7 @@
 import prisma from "../lib/prisma.js";
 import activityService from "./activityService.js";
 import { createPartnerInTransaction } from "./partnerService.js";
+import customFieldService from "./customFieldService.js";
 
 const memberSelect = { id: true, user: { select: { firstName: true, lastName: true } } };
 export function buildLeadSelect({ includeConvertedPartner = false } = {}) { return {
@@ -49,6 +50,16 @@ export async function createLead(args, client = prisma) {
     const lead = await tx.lead.create({ data: { ...args.data, organizationId: args.organizationId, createdByMemberId: args.actorMemberId || null }, select: buildLeadSelect() });
     await log(tx, args, lead, "CREATED", "Érdeklődő létrehozva");
     if (lead.assignedMemberId !== null) await log(tx, args, lead, "ASSIGNED", "Érdeklődő felelőse megváltozott", { oldAssigneeMemberId: null, newAssigneeMemberId: lead.assignedMemberId });
+
+    if (args.customFieldValues !== undefined && args.customFieldValues !== null) {
+      await customFieldService.setCustomFieldValues({
+        organizationId: args.organizationId,
+        entityType: "LEAD",
+        entityId: lead.id,
+        values: args.customFieldValues
+      }, tx);
+    }
+
     return lead;
   });
 }
@@ -61,16 +72,29 @@ export async function updateLead(args, client = prisma) {
     if (!existing) return null;
     if (!(await validMember(args.organizationId, args.data.assignedMemberId, tx))) return null;
     const changedFields = Object.keys(args.data).filter((key) => args.data[key] !== existing[key]);
-    if (!changedFields.length) return existing;
-    const lead = await tx.lead.update({ where: { id: args.leadId, organizationId: args.organizationId }, data: args.data, select: buildLeadSelect() });
-    if (changedFields.includes("status")) await log(tx, args, lead, "STATUS_CHANGED", "Érdeklődő státusza megváltozott", { field: "status", oldValue: existing.status, newValue: lead.status });
-    if (changedFields.includes("assignedMemberId")) await log(tx, args, lead, "ASSIGNED", "Érdeklődő felelőse megváltozott", {
-      oldAssigneeMemberId: existing.assignedMemberId, newAssigneeMemberId: lead.assignedMemberId,
-      oldAssigneeName: existing.assignedMember ? [existing.assignedMember.user.firstName, existing.assignedMember.user.lastName].join(" ") : null,
-      newAssigneeName: lead.assignedMember ? [lead.assignedMember.user.firstName, lead.assignedMember.user.lastName].join(" ") : null,
-    });
-    const otherFields = changedFields.filter((key) => !["status", "assignedMemberId"].includes(key));
-    if (otherFields.length) await log(tx, args, lead, "UPDATED", "Érdeklődő módosítva", { changedFields: otherFields });
+    
+    let lead = existing;
+    if (changedFields.length) {
+      lead = await tx.lead.update({ where: { id: args.leadId, organizationId: args.organizationId }, data: args.data, select: buildLeadSelect() });
+      if (changedFields.includes("status")) await log(tx, args, lead, "STATUS_CHANGED", "Érdeklődő státusza megváltozott", { field: "status", oldValue: existing.status, newValue: lead.status });
+      if (changedFields.includes("assignedMemberId")) await log(tx, args, lead, "ASSIGNED", "Érdeklődő felelőse megváltozott", {
+        oldAssigneeMemberId: existing.assignedMemberId, newAssigneeMemberId: lead.assignedMemberId,
+        oldAssigneeName: existing.assignedMember ? [existing.assignedMember.user.firstName, existing.assignedMember.user.lastName].join(" ") : null,
+        newAssigneeName: lead.assignedMember ? [lead.assignedMember.user.firstName, lead.assignedMember.user.lastName].join(" ") : null,
+      });
+      const otherFields = changedFields.filter((key) => !["status", "assignedMemberId"].includes(key));
+      if (otherFields.length) await log(tx, args, lead, "UPDATED", "Érdeklődő módosítva", { changedFields: otherFields });
+    }
+
+    if (args.customFieldValues !== undefined && args.customFieldValues !== null) {
+      await customFieldService.setCustomFieldValues({
+        organizationId: args.organizationId,
+        entityType: "LEAD",
+        entityId: lead.id,
+        values: args.customFieldValues
+      }, tx);
+    }
+
     return lead;
   });
 }
@@ -80,6 +104,9 @@ export async function deleteLead(args, client = prisma) {
     await tx.$queryRaw`SELECT true AS locked FROM pg_advisory_xact_lock(${args.organizationId}::integer, ${args.leadId}::integer)`;
     const lead = await getLeadById(args, tx);
     if (!lead) return false;
+    await tx.customFieldValue.deleteMany({
+      where: { organizationId: args.organizationId, entityType: "LEAD", entityId: args.leadId }
+    });
     const result = await tx.lead.deleteMany({ where: { id: args.leadId, organizationId: args.organizationId } });
     if (result.count !== 1) return false;
     await log(tx, args, lead, "DELETED", "Érdeklődő törölve");

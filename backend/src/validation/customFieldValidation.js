@@ -67,47 +67,58 @@ export function normalizeCustomFieldDefinition(body, { partial = false } = {}) {
     data.defaultValue = body.defaultValue;
   }
 
-  // Determine fieldType context
-  const fieldType = data.fieldType || body.fieldType; // for create it's in data. For update we might need to know it from somewhere else but we don't have the existing field here. Wait, instructions say: "options: required for SELECT/MULTI_SELECT (array of strings, min 1 item, each max 200 chars), must be null for other types"
-  
+  // Options validation
   if (body.options !== undefined) {
     if (body.options === null) {
       data.options = null;
     } else if (Array.isArray(body.options)) {
-      if (body.options.length < 1) return { error: 'options must have at least 1 item.' };
+      if (body.options.length < 1) return { error: 'A választási lehetőségek listája nem lehet üres.' };
       if (!body.options.every(o => typeof o === 'string' && o.length <= 200)) {
-        return { error: 'Each option must be a string up to 200 chars.' };
+        return { error: 'Minden opciónak szövegesnek kell lennie (max 200 karakter).' };
       }
       data.options = body.options;
     } else {
-      return { error: 'options must be an array of strings or null.' };
+      return { error: 'Az opcióknak tömb formátumúnak kell lenniük.' };
+    }
+  }
+
+  if (!partial && (data.fieldType === 'SELECT' || data.fieldType === 'MULTI_SELECT')) {
+    if (!Array.isArray(data.options) || data.options.length < 1) {
+      return { error: 'A legördülő és többválasztós mezőkhöz legalább egy opció megadása kötelező.' };
     }
   }
 
   return { data };
 }
 
-export function normalizeCustomFieldValues(values, fields) {
-  if (!Array.isArray(values)) return { error: 'values must be an array' };
-  
+export function normalizeCustomFieldValues(values, fields, { isCreate = false } = {}) {
+  const inputList = values === undefined || values === null ? [] : values;
+  if (!Array.isArray(inputList)) return { error: 'A customFieldValues mezőnek tömbnek kell lennie.' };
+
   const normalized = [];
   const fieldsById = new Map(fields.map(f => [f.id, f]));
+  const seenFieldIds = new Set();
 
-  for (const item of values) {
-    if (!item || !Number.isInteger(item.customFieldId) || item.customFieldId <= 0) {
-      return { error: 'Invalid customFieldId' };
+  for (const item of inputList) {
+    if (!item || typeof item !== 'object' || !Number.isInteger(item.customFieldId) || item.customFieldId <= 0) {
+      return { error: 'Érvénytelen customFieldId.' };
     }
+
+    if (seenFieldIds.has(item.customFieldId)) {
+      return { error: `Ismétlődő customFieldId a kérésben: ${item.customFieldId}.` };
+    }
+    seenFieldIds.add(item.customFieldId);
 
     const field = fieldsById.get(item.customFieldId);
     if (!field) {
-      return { error: `Field with id ${item.customFieldId} not found or not active.` };
+      return { error: `A(z) ${item.customFieldId} azonosítójú mező nem létezik vagy inaktív.` };
     }
 
     let val = item.value;
-    const isEmpty = val === null || val === undefined || val === '';
+    const isEmpty = val === null || val === undefined || (typeof val === 'string' && val.trim() === '');
 
     if (field.required && isEmpty) {
-      return { error: `Field ${field.label} is required.` };
+      return { error: `A(z) ${field.label} mező kitöltése kötelező.` };
     }
 
     if (isEmpty) {
@@ -115,52 +126,79 @@ export function normalizeCustomFieldValues(values, fields) {
       continue;
     }
 
-    // stringify if necessary or keep string
-    let stringVal = String(val);
+    let stringVal = typeof val === 'string' ? val.trim() : String(val);
 
     switch (field.fieldType) {
       case 'NUMBER':
-      case 'MONEY':
-        const num = Number(val);
-        if (!Number.isFinite(num)) return { error: `Field ${field.label} must be a number.` };
+      case 'MONEY': {
+        const num = Number(stringVal);
+        if (!Number.isFinite(num)) return { error: `A(z) ${field.label} mező csak szám lehet.` };
         stringVal = num.toString();
         break;
-      case 'BOOLEAN':
-        if (stringVal !== 'true' && stringVal !== 'false') return { error: `Field ${field.label} must be 'true' or 'false'.` };
-        break;
-      case 'DATE':
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(stringVal)) return { error: `Field ${field.label} must be YYYY-MM-DD.` };
-        break;
-      case 'DATETIME':
-        if (isNaN(Date.parse(stringVal))) return { error: `Field ${field.label} must be a valid ISO datetime.` };
-        stringVal = new Date(stringVal).toISOString();
-        break;
-      case 'SELECT':
-        if (!Array.isArray(field.options) || !field.options.includes(stringVal)) {
-          return { error: `Invalid option for ${field.label}.` };
+      }
+      case 'BOOLEAN': {
+        if (stringVal !== 'true' && stringVal !== 'false') {
+          return { error: `A(z) ${field.label} mező értéke csak 'true' vagy 'false' lehet.` };
         }
         break;
-      case 'MULTI_SELECT':
+      }
+      case 'DATE': {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(stringVal)) {
+          return { error: `A(z) ${field.label} mező dátum formátuma ÉÉÉÉ-HH-NN kell legyen.` };
+        }
+        break;
+      }
+      case 'DATETIME': {
+        if (isNaN(Date.parse(stringVal))) {
+          return { error: `A(z) ${field.label} mező érvényes ISO dátum és idő formátumú kell legyen.` };
+        }
+        stringVal = new Date(stringVal).toISOString();
+        break;
+      }
+      case 'SELECT': {
+        const opts = Array.isArray(field.options) ? field.options : [];
+        if (!opts.includes(stringVal)) {
+          return { error: `Érvénytelen választás a(z) ${field.label} mezőnél.` };
+        }
+        break;
+      }
+      case 'MULTI_SELECT': {
         try {
           const arr = typeof val === 'string' ? JSON.parse(val) : val;
-          if (!Array.isArray(arr) || !arr.every(o => field.options?.includes(o))) {
-            return { error: `Invalid options for ${field.label}.` };
+          const opts = Array.isArray(field.options) ? field.options : [];
+          if (!Array.isArray(arr) || !arr.every(o => opts.includes(o))) {
+            return { error: `Érvénytelen választás a(z) ${field.label} mezőnél.` };
           }
           stringVal = JSON.stringify(arr);
         } catch {
-          return { error: `Invalid MULTI_SELECT value for ${field.label}.` };
+          return { error: `A(z) ${field.label} többválasztós mező érvénytelen.` };
         }
         break;
-      case 'TEXTAREA':
-        if (stringVal.length > 10000) return { error: `Field ${field.label} exceeds 10000 chars.` };
+      }
+      case 'TEXTAREA': {
+        if (stringVal.length > 10000) return { error: `A(z) ${field.label} mező legfeljebb 10000 karakter lehet.` };
         break;
+      }
       case 'TEXT':
-      default:
-        if (stringVal.length > 2000) return { error: `Field ${field.label} exceeds 2000 chars.` };
+      default: {
+        if (stringVal.length > 2000) return { error: `A(z) ${field.label} mező legfeljebb 2000 karakter lehet.` };
         break;
+      }
     }
 
     normalized.push({ customFieldId: field.id, value: stringVal });
+  }
+
+  // Create ellenőrzés: minden aktív kötelező mezőnek rendelkeznie kell nem-üres értékkel!
+  if (isCreate) {
+    for (const field of fields) {
+      if (field.required) {
+        const found = normalized.find(n => n.customFieldId === field.id);
+        if (!found || found.value === null) {
+          return { error: `A(z) ${field.label} mező kitöltése kötelező.` };
+        }
+      }
+    }
   }
 
   return { data: normalized };

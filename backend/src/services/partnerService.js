@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
 import activityService from "./activityService.js";
+import customFieldService from "./customFieldService.js";
 
 async function getPartners({ organizationId }) {
   const partners = await prisma.partner.findMany({
@@ -50,7 +51,7 @@ async function getPartnerById({ partnerId, organizationId }) {
   });
 }
 
-export async function createPartnerInTransaction({ organizationId, actorMemberId, data }, tx) {
+export async function createPartnerInTransaction({ organizationId, actorMemberId, data, customFieldValues }, tx) {
     const partner = await tx.partner.create({
       data: {
         organizationId,
@@ -75,14 +76,23 @@ export async function createPartnerInTransaction({ organizationId, actorMemberId
       tx,
     );
 
+    if (customFieldValues !== undefined && customFieldValues !== null) {
+      await customFieldService.setCustomFieldValues({
+        organizationId,
+        entityType: "PARTNER",
+        entityId: partner.id,
+        values: customFieldValues,
+      }, tx);
+    }
+
     return partner;
 }
 
-async function createPartner({ organizationId, actorMemberId, data }) {
-  return prisma.$transaction((tx) => createPartnerInTransaction({ organizationId, actorMemberId, data }, tx));
+async function createPartner({ organizationId, actorMemberId, data, customFieldValues }) {
+  return prisma.$transaction((tx) => createPartnerInTransaction({ organizationId, actorMemberId, data, customFieldValues }, tx));
 }
 
-async function updatePartner({ organizationId, actorMemberId, partnerId, data }) {
+async function updatePartner({ organizationId, actorMemberId, partnerId, data, customFieldValues }) {
   const fields = ["name", "email", "phone", "type", "address", "website", "taxNumber", "note"];
   const changes = Object.fromEntries(
     fields.filter((field) => Object.hasOwn(data, field)).map((field) => [field, data[field]]),
@@ -100,13 +110,14 @@ async function updatePartner({ organizationId, actorMemberId, partnerId, data })
       return oldVal !== newVal;
     });
 
-    const updated = await tx.partner.update({
-      where: { id: partnerId, organizationId },
-      data: changes,
-      include: { contacts: true },
-    });
-
+    let updated = existing;
     if (changedFields.length > 0) {
+      updated = await tx.partner.update({
+        where: { id: partnerId, organizationId },
+        data: changes,
+        include: { contacts: true },
+      });
+
       await activityService.createActivity(
         {
           organizationId,
@@ -120,6 +131,15 @@ async function updatePartner({ organizationId, actorMemberId, partnerId, data })
         },
         tx,
       );
+    }
+
+    if (customFieldValues !== undefined && customFieldValues !== null) {
+      await customFieldService.setCustomFieldValues({
+        organizationId,
+        entityType: "PARTNER",
+        entityId: updated.id,
+        values: customFieldValues,
+      }, tx);
     }
 
     return updated;
@@ -140,6 +160,10 @@ async function deletePartner({ organizationId, actorMemberId, partnerId }) {
       error.statusCode = 409;
       throw error;
     }
+
+    await tx.customFieldValue.deleteMany({
+      where: { organizationId, entityType: "PARTNER", entityId: partnerId },
+    });
 
     await activityService.createActivity(
       {

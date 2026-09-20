@@ -1,5 +1,5 @@
 const PARTNER_TYPES = new Set(["COMPANY", "PERSON"]);
-const ALLOWED_FIELDS = new Set(["type", "name", "email", "phone", "website", "taxNumber", "address", "note"]);
+const ALLOWED_FIELDS = new Set(["type", "name", "email", "phone", "website", "taxNumber", "address", "note", "customFieldValues"]);
 const OPTIONAL_LIMITS = Object.freeze({
   email: 254,
   phone: 50,
@@ -35,6 +35,12 @@ export function normalizePartnerPayload(body, { partial = false } = {}) {
     if (field === "email" && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return { error: "Érvénytelen e-mail cím." };
     if (field === "phone" && value && (!/^\+?[\d\s().-]+$/.test(value) || value.replace(/\D/g, "").length < 6 || value.replace(/\D/g, "").length > 15)) return { error: "Érvénytelen telefonszám." };
     data[field] = value;
+  }
+  if (Object.hasOwn(body, "customFieldValues")) {
+    if (body.customFieldValues !== null && !Array.isArray(body.customFieldValues)) {
+      return { error: "A customFieldValues mezőnek tömbnek kell lennie." };
+    }
+    data.customFieldValues = body.customFieldValues;
   }
   return { data };
 }

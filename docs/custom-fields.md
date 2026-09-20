@@ -86,9 +86,16 @@ A meglévő jogosultsági konvencióhoz (`{MODULE}_{ACTION}`) igazodva a követk
 
 ---
 
-## 4. Backend Végpontok (REST API)
+## 4. Backend Végpontok és Atomikus Életciklus (REST API & Atomic Lifecycle)
 
-Minden végpont az `/api/custom-fields` bázis alatt érhető el:
+### Atomikus Entitás Létrehozás és Módosítás (Single-Request & Single-Transaction)
+Az egyéni mezők közvetlen részei a Lead és Partner életciklusának:
+- `POST /api/leads` és `PATCH /api/leads/:id`
+- `POST /api/partners` és `PATCH /api/partners/:id`
+
+Mind a négy végpont elfogadja a törzsben a `customFieldValues: [{ customFieldId: number, value: any }]` tömböt.
+- **Tranzakciós garancia**: Az alapadatok és az egyéni mezők mentése egyetlen osztatlan adatbázis-tranzakcióban (`prisma.$transaction`) fut le. Ha bármely egyéni mező érvénytelen (hibás típus, opciókon kívüli érték, idegen bérlőhöz tartozó mező) vagy kötelező mező hiányzik, a teljes tranzakció visszagördül (rollback), és a Lead/Partner nem jön létre, illetve nem módosul.
+- **Kötelező mezők védelme (isCreate: true)**: Új entitás létrehozásakor a backend ellenőrzi, hogy a bérlő összes aktív és kötelező (`required: true`) egyéni mezője kitöltésre került-e. Ha nem, `400 Bad Request` hibát ad vissza, megelőzve az inkomplett adatrekordok mentését.
 
 ### Meződefiníciók kezelése (Admin)
 - `GET /api/custom-fields?entityType=LEAD`
@@ -96,7 +103,7 @@ Minden végpont az `/api/custom-fields` bázis alatt érhető el:
   - Visszaadja a bérlő összes egyéni mezőjét (aktívakat és inaktívakat), kitöltöttségi számlálóval (`_count.values`).
 - `POST /api/custom-fields`
   - Jogosultság: `CUSTOM_FIELDS_CREATE`
-  - Létrehoz egy új mezőt. Validálja a kulcsot (`[a-z0-9_]`), a típust és a SELECT opciókat. Duplikált kulcs esetén `409 Conflict`.
+  - Létrehoz egy új mezőt. Validálja a kulcsot (`[a-z0-9_]`), a típust, a SELECT opciókat és a default értéket. Duplikált kulcs esetén `409 Conflict`.
 - `PATCH /api/custom-fields/:id`
   - Jogosultság: `CUSTOM_FIELDS_EDIT`
   - Módosítja a mező megjelenési adatait. A `key` és a `fieldType` módosítása tilos a konzisztencia védelmében.
@@ -104,12 +111,15 @@ Minden végpont az `/api/custom-fields` bázis alatt érhető el:
   - Jogosultság: `CUSTOM_FIELDS_DELETE`
   - Deaktiválja a mezőt (`active: false`), megőrizve a meglévő adatokat.
 
-### Entitás értékek kezelése (Forms & Detail Views)
+### Önálló Entitás Érték Kezelés (Gated Endpoints)
 - `GET /api/custom-fields/values?entityType=LEAD&entityId=123`
-  - Visszaadja a definiált aktív mezőket és az adott entitáshoz mentett értékek kulcs-érték térképét `{ fields, values }`.
+  - Jogosultság: `LEADS_VIEW` (vagy `PARTNERS_VIEW`) és a megfelelő modul megléte.
+  - Tenant és entitás létezés ellenőrzés: ha az entitás nem létezik a bérlőhöz, `404 Not Found` hibát ad vissza.
+  - Visszaadja a definiált aktív mezőket és a mentett értékeket: `{ fields, values }`.
 - `PUT /api/custom-fields/values`
-  - Tömeges mentés: `{ entityType, entityId, values: [{ customFieldId, value }] }`
-  - Tranzakcióban végzi el a mezők validálását (típusellenőrzés, kötelező mezők, opció-ellenőrzés) és upsert-elését.
+  - Jogosultság: `LEADS_EDIT` (vagy `PARTNERS_EDIT`) és a modul megléte.
+  - Tömeges mentés: `{ entityType, entityId, values: [{ customFieldId, value }] }`.
+  - Szigorúan ellenőrzi az entitás bérlőhöz tartozását (`404`), validálja a mezőértékeket, és tranzakcióban törli az üres (`null` / `""`) értékeket és upsert-eli a nem üreseket.
 
 ---
 
@@ -119,11 +129,15 @@ Minden végpont az `/api/custom-fields` bázis alatt érhető el:
    - `SettingsCustomFieldsPage.jsx`: Entitás-választó fülek (Lead / Partner), táblázatos lista sorrenddel, típussal, kötelező státusszal és műveleti gombokkal.
    - `CustomFieldFormComponent.jsx`: Jobbról becsúszó fiók (drawer) az új mezők felvételéhez és szerkesztéséhez, SELECT opciók több soros szerkesztőjével.
 2. **Űrlap integráció (`CustomFieldValuesSection.jsx`)**:
-   - Újrahasználható dinamikus mezőrenderelő komponens, amely automatikusan illeszkedik a Lead és Partner űrlapok (`LeadFormComponent`, `PartnerFormComponent`) megjelenéséhez.
-   - Entitás létrehozása vagy módosítása után a sikeres mentés hook-jában automatikusan elküldi a kitöltött egyéni mezőértékeket.
-3. **Adatlap megjelenítés**:
-   - `LeadShowComponent.jsx` és `PartnerShowComponent.jsx`: Új "Egyéni mezők" szekció jeleníti meg a kitöltött értékeket címke-érték elrendezésben, megfelelő formázással (pl. Boolean esetén Igen/Nem, dátumok formázása).
-4. **Navigáció**:
+   - Újrahasználható dinamikus mezőrenderelő komponens a Lead és Partner űrlapokhoz (`LeadFormComponent`, `PartnerFormComponent`).
+   - Értékváltozáskor közvetlenül az űrlap belső állapotát (`customFieldValues`) frissíti.
+   - Kötelező logikai mező (`BOOLEAN` + `required: true`) esetén 3-állapotú választót jelenít meg (`— Válassz —`, `Igen`, `Nem`), biztosítva a kötelező kitöltés érvényesíthetőségét.
+3. **Egyetlen atomikus mentési hívás**:
+   - `LeadFormComponent.jsx` és `PartnerFormComponent.jsx` egyetlen `POST` vagy `PATCH` kérésben küldi el az összes adatot a `customFieldValues` tömbbel együtt. Nincs második aszinkron hívás, nincs részleges mentési hibaállapot.
+   - Hiba esetén a fiók nyitva marad, a backend által adott pontos hibaüzenet megjelenik az űrlapon.
+4. **Adatlap megjelenítés**:
+   - `LeadShowComponent.jsx` és `PartnerShowComponent.jsx`: Az "Egyéni mezők" szekció jeleníti meg a kitöltött értékeket címke-érték elrendezésben, megfelelő formázással (pl. Boolean esetén Igen/Nem, dátumok formázása).
+5. **Navigáció**:
    - `Sidebar.jsx`: A "Beállítások" menüpont lenyitható almenüvé bővült ("Jogosultságok" és "Egyéni mezők").
 
 ---

@@ -78,29 +78,18 @@ function PartnerForm({ mode = "create", partner, onClose, onSaved }) {
       Object.entries(formData).map(([key, value]) => [key, typeof value === "string" ? value.trim() || null : value]),
     );
     payload.type = formData.type;
+    payload.customFieldValues = customFieldValues;
 
     try {
       const response = isEditing
         ? await apiClient.patch(`/partners/${partner.id}`, payload)
         : await apiClient.post("/partners", payload);
 
-      if (customFieldValues.length > 0) {
-        try {
-          await apiClient.put("/custom-fields/values", {
-            entityType: "PARTNER",
-            entityId: response.data.id,
-            values: customFieldValues,
-          });
-        } catch {
-          // ignore
-        }
-      }
-
       onSaved?.(response.data);
       showSuccess(isEditing ? "A partner adatai sikeresen módosultak." : "A partner sikeresen létrejött.");
       onClose();
     } catch (requestError) {
-      setError(requestError.message || "A partner mentése sikertelen.");
+      setError(requestError.response?.data?.message || requestError.message || "A partner mentése sikertelen.");
     } finally {
       setSubmitting(false);
     }

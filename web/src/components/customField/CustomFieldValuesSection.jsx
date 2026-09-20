@@ -188,10 +188,34 @@ export default function CustomFieldValuesSection({ entityType, entityId, onChang
           }
 
           if (isBoolean) {
+            if (field.required) {
+              return (
+                <label key={field.id} className={`${labelClass} ${spanClass}`}>
+                  <span>{field.label} <span className="text-[#9a4335]">*</span></span>
+                  <select
+                    className={fieldClass}
+                    value={val}
+                    onChange={e => handleChange(field.id, e.target.value)}
+                    required
+                  >
+                    <option value="">— Válassz —</option>
+                    <option value="true">Igen</option>
+                    <option value="false">Nem</option>
+                  </select>
+                  {field.helpText && <p className="text-[11px] text-[#7b8885]">{field.helpText}</p>}
+                </label>
+              );
+            }
+
             return (
-              <label key={field.id} className={`${labelClass} ${spanClass} flex-row items-center`}>
-                <input type="checkbox" className="size-4 accent-[#6fa675]" checked={val === 'true'} onChange={e => handleChange(field.id, e.target.checked ? 'true' : 'false')} required={field.required && val !== 'true'} />
-                {field.label} {field.required && <span className="text-[#9a4335]">*</span>}
+              <label key={field.id} className={`${labelClass} ${spanClass} flex-row items-center gap-2 cursor-pointer`}>
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[#6fa675]"
+                  checked={val === 'true'}
+                  onChange={e => handleChange(field.id, e.target.checked ? 'true' : 'false')}
+                />
+                <span>{field.label}</span>
                 {field.helpText && <p className="text-[11px] text-[#7b8885] ml-2">{field.helpText}</p>}
               </label>
             );

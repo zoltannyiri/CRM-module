@@ -1,5 +1,7 @@
 import customFieldService from '../services/customFieldService.js';
 import { normalizeCustomFieldDefinition, normalizeCustomFieldValues } from '../validation/customFieldValidation.js';
+import { hasPermission } from '../services/permissionService.js';
+import { isModuleEnabled } from '../services/organizationModuleService.js';
 
 function positiveId(value) {
   if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null;
@@ -108,6 +110,25 @@ const getEntityValues = async (req, res, next) => {
       return res.status(400).json({ message: 'Érvénytelen entitás azonosító.' });
     }
 
+    if (entityType === 'LEAD') {
+      const moduleOk = await isModuleEnabled(req.organization.id, 'LEADS');
+      const permOk = await hasPermission(req.membership, 'LEADS_VIEW');
+      if (!moduleOk || !permOk) return res.status(403).json({ message: 'Nincs jogosultságod a művelethez.', code: 'PERMISSION_DENIED' });
+    } else {
+      const moduleOk = await isModuleEnabled(req.organization.id, 'PARTNERS');
+      const permOk = await hasPermission(req.membership, 'PARTNERS_VIEW');
+      if (!moduleOk || !permOk) return res.status(403).json({ message: 'Nincs jogosultságod a művelethez.', code: 'PERMISSION_DENIED' });
+    }
+
+    const exists = await customFieldService.assertEntityExists({
+      organizationId: req.organization.id,
+      entityType,
+      entityId: parsedEntityId
+    });
+    if (!exists) {
+      return res.status(404).json({ message: entityType === 'LEAD' ? 'Érdeklődő nem található.' : 'Partner nem található.' });
+    }
+
     const data = await customFieldService.getCustomFieldValues({
       organizationId: req.organization.id,
       entityType,
@@ -133,6 +154,25 @@ const setEntityValues = async (req, res, next) => {
     }
     if (!Array.isArray(values)) {
       return res.status(400).json({ message: 'A values tömb formátumú kell legyen.' });
+    }
+
+    if (entityType === 'LEAD') {
+      const moduleOk = await isModuleEnabled(req.organization.id, 'LEADS');
+      const permOk = await hasPermission(req.membership, 'LEADS_EDIT');
+      if (!moduleOk || !permOk) return res.status(403).json({ message: 'Nincs jogosultságod a művelethez.', code: 'PERMISSION_DENIED' });
+    } else {
+      const moduleOk = await isModuleEnabled(req.organization.id, 'PARTNERS');
+      const permOk = await hasPermission(req.membership, 'PARTNERS_EDIT');
+      if (!moduleOk || !permOk) return res.status(403).json({ message: 'Nincs jogosultságod a művelethez.', code: 'PERMISSION_DENIED' });
+    }
+
+    const exists = await customFieldService.assertEntityExists({
+      organizationId: req.organization.id,
+      entityType,
+      entityId: parsedEntityId
+    });
+    if (!exists) {
+      return res.status(404).json({ message: entityType === 'LEAD' ? 'Érdeklődő nem található.' : 'Partner nem található.' });
     }
 
     const activeFields = await customFieldService.getActiveCustomFields({

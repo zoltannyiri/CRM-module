@@ -32,10 +32,15 @@ test("Custom Fields real database tenant, permissions, validation and values", {
     mock.module("../src/lib/prisma.js", { defaultExport: prisma });
 
     const { default: customFieldRoutes } = await import("../src/routes/customFieldRoutes.js");
+    const { default: leadRoutes } = await import("../src/routes/leadRoutes.js");
+    const { default: partnerRoutes } = await import("../src/routes/partnerRoutes.js");
     const { generateAccessToken } = await import("../src/utils/token.js");
+    const { initializeOrganizationModules } = await import("../src/services/organizationModuleService.js");
 
     const org = await prisma.organization.create({ data: { name: "CF Audit", slug: schema } });
     const other = await prisma.organization.create({ data: { name: "Foreign", slug: schema + "_other" } });
+    await initializeOrganizationModules(org.id, undefined, prisma);
+    await initializeOrganizationModules(other.id, undefined, prisma);
 
     const makeMember = async (role, organizationId = org.id) => {
       const user = await prisma.user.create({
@@ -52,6 +57,8 @@ test("Custom Fields real database tenant, permissions, validation and values", {
     const app = express();
     app.use(express.json());
     app.use("/api/custom-fields", customFieldRoutes);
+    app.use("/api/leads", leadRoutes);
+    app.use("/api/partners", partnerRoutes);
     app.use((error, _req, res, _next) => {
       const status = error.statusCode || 500;
       return res.status(status).json({ message: status >= 500 ? "Technical error" : error.message });
@@ -212,6 +219,9 @@ test("Custom Fields real database tenant, permissions, validation and values", {
       });
 
       await t.test("15. set values: required field empty returns 400", async () => {
+        const lead = await prisma.lead.create({
+          data: { organizationId: org.id, name: "Lead For Req Check" }
+        });
         const reqField = await prisma.customField.create({
           data: {
             organizationId: org.id, entityType: "LEAD", key: "budget",
@@ -220,23 +230,29 @@ test("Custom Fields real database tenant, permissions, validation and values", {
         });
         const { status } = await req("/api/custom-fields/values", {
           method: "PUT",
-          body: { entityType: "LEAD", entityId: 1, values: [{ customFieldId: reqField.id, value: "" }] }
+          body: { entityType: "LEAD", entityId: lead.id, values: [{ customFieldId: reqField.id, value: "" }] }
         });
         assert.equal(status, 400);
       });
 
       await t.test("16. set values: NUMBER type rejects non-numeric", async () => {
+        const lead = await prisma.lead.create({
+          data: { organizationId: org.id, name: "Lead For Num Check" }
+        });
         const numField = await prisma.customField.create({
           data: { organizationId: org.id, entityType: "LEAD", key: "amount", label: "Osszeg", fieldType: "NUMBER" }
         });
         const { status } = await req("/api/custom-fields/values", {
           method: "PUT",
-          body: { entityType: "LEAD", entityId: 1, values: [{ customFieldId: numField.id, value: "abc" }] }
+          body: { entityType: "LEAD", entityId: lead.id, values: [{ customFieldId: numField.id, value: "abc" }] }
         });
         assert.equal(status, 400);
       });
 
       await t.test("17. set values: SELECT type rejects values not in options", async () => {
+        const lead = await prisma.lead.create({
+          data: { organizationId: org.id, name: "Lead For Sel Check" }
+        });
         const selField = await prisma.customField.create({
           data: {
             organizationId: org.id, entityType: "LEAD", key: "tier",
@@ -245,7 +261,7 @@ test("Custom Fields real database tenant, permissions, validation and values", {
         });
         const { status } = await req("/api/custom-fields/values", {
           method: "PUT",
-          body: { entityType: "LEAD", entityId: 1, values: [{ customFieldId: selField.id, value: "Platinum" }] }
+          body: { entityType: "LEAD", entityId: lead.id, values: [{ customFieldId: selField.id, value: "Platinum" }] }
         });
         assert.equal(status, 400);
       });
@@ -269,7 +285,7 @@ test("Custom Fields real database tenant, permissions, validation and values", {
         assert.ok(getResp.body.fields.some(f => f.id === textField.id));
       });
 
-      await t.test("19. foreign org cannot read values via tenant isolation", async () => {
+      await t.test("19. foreign org cannot read or write values via tenant isolation (404)", async () => {
         const lead = await prisma.lead.create({
           data: { organizationId: org.id, name: "Private Lead" }
         });
@@ -280,11 +296,253 @@ test("Custom Fields real database tenant, permissions, validation and values", {
           method: "PUT",
           body: { entityType: "LEAD", entityId: lead.id, values: [{ customFieldId: privateField.id, value: "Secret data" }] }
         });
-        const { status, body } = await req(`/api/custom-fields/values?entityType=LEAD&entityId=${lead.id}`, { token: foreignToken });
-        assert.equal(status, 200);
-        // Tenant isolation: foreign org does not see org's private field or its value
-        assert.equal(body.values[privateField.id], undefined);
-        assert.ok(!body.fields.some(f => f.id === privateField.id));
+        // Foreign tenant tries to read lead belonging to org -> 404
+        const { status } = await req(`/api/custom-fields/values?entityType=LEAD&entityId=${lead.id}`, { token: foreignToken });
+        assert.equal(status, 404);
+
+        // Foreign tenant tries to write lead belonging to org -> 404
+        const putResp = await req("/api/custom-fields/values", {
+          token: foreignToken,
+          method: "PUT",
+          body: { entityType: "LEAD", entityId: lead.id, values: [] }
+        });
+        assert.equal(putResp.status, 404);
+      });
+
+      await t.test("20. standalone values endpoint permissions: requires LEADS_VIEW / LEADS_EDIT", async () => {
+        const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Permission Lead" } });
+        await setPermissions([]);
+        const getResp = await req(`/api/custom-fields/values?entityType=LEAD&entityId=${lead.id}`, { token: userToken });
+        assert.equal(getResp.status, 403);
+        const putResp = await req("/api/custom-fields/values", {
+          token: userToken,
+          method: "PUT",
+          body: { entityType: "LEAD", entityId: lead.id, values: [] }
+        });
+        assert.equal(putResp.status, 403);
+
+        await setPermissions(["LEADS_VIEW"]);
+        const getResp2 = await req(`/api/custom-fields/values?entityType=LEAD&entityId=${lead.id}`, { token: userToken });
+        assert.equal(getResp2.status, 200);
+
+        await setPermissions(["LEADS_EDIT"]);
+        const putResp2 = await req("/api/custom-fields/values", {
+          token: userToken,
+          method: "PUT",
+          body: { entityType: "LEAD", entityId: lead.id, values: [] }
+        });
+        assert.equal(putResp2.status, 200);
+      });
+
+      await t.test("21. Lead create with customFieldValues atomically creates lead and custom field value", async () => {
+        // Clean up prior test fields to have an isolated field set
+        await prisma.customField.updateMany({ where: { organizationId: org.id }, data: { active: false } });
+
+        const reqField = await prisma.customField.create({
+          data: { organizationId: org.id, entityType: "LEAD", key: "lead_req_text", label: "Req Field", fieldType: "TEXT", required: true }
+        });
+        const optField = await prisma.customField.create({
+          data: { organizationId: org.id, entityType: "LEAD", key: "lead_opt_num", label: "Opt Num", fieldType: "NUMBER", required: false }
+        });
+
+        const resp = await req("/api/leads", {
+          method: "POST",
+          body: {
+            name: "Atomic Lead Success",
+            customFieldValues: [
+              { customFieldId: reqField.id, value: "Mandatory value" },
+              { customFieldId: optField.id, value: "42" }
+            ]
+          }
+        });
+        assert.equal(resp.status, 201);
+        const leadId = resp.body.id;
+        assert.ok(leadId);
+
+        const values = await prisma.customFieldValue.findMany({ where: { organizationId: org.id, entityType: "LEAD", entityId: leadId } });
+        const reqVal = values.find(v => v.customFieldId === reqField.id);
+        const optVal = values.find(v => v.customFieldId === optField.id);
+        assert.equal(reqVal.value, "Mandatory value");
+        assert.equal(optVal.value, "42");
+      });
+
+      await t.test("22. Lead create missing required custom field fails with 400 and rolls back (lead not created)", async () => {
+        const countBefore = await prisma.lead.count({ where: { organizationId: org.id } });
+        const resp = await req("/api/leads", {
+          method: "POST",
+          body: {
+            name: "Should Not Exist",
+            customFieldValues: []
+          }
+        });
+        assert.equal(resp.status, 400);
+        assert.match(resp.body.message, /kitöltése kötelező/i);
+
+        const countAfter = await prisma.lead.count({ where: { organizationId: org.id } });
+        assert.equal(countAfter, countBefore);
+        const found = await prisma.lead.findFirst({ where: { organizationId: org.id, name: "Should Not Exist" } });
+        assert.equal(found, null);
+      });
+
+      await t.test("23. Lead create invalid NUMBER value fails with 400 and rolls back", async () => {
+        const reqField = await prisma.customField.findFirst({ where: { key: "lead_req_text", organizationId: org.id, active: true } });
+        const optField = await prisma.customField.findFirst({ where: { key: "lead_opt_num", organizationId: org.id, active: true } });
+        const countBefore = await prisma.lead.count({ where: { organizationId: org.id } });
+        const resp = await req("/api/leads", {
+          method: "POST",
+          body: {
+            name: "Invalid Number Lead",
+            customFieldValues: [
+              { customFieldId: reqField.id, value: "Valid" },
+              { customFieldId: optField.id, value: "not_a_number" }
+            ]
+          }
+        });
+        assert.equal(resp.status, 400);
+        assert.match(resp.body.message, /csak szám lehet|számnak kell lennie/i);
+
+        const countAfter = await prisma.lead.count({ where: { organizationId: org.id } });
+        assert.equal(countAfter, countBefore);
+      });
+
+      await t.test("24. Lead create with foreign org customFieldId fails with 400", async () => {
+        const foreignField = await prisma.customField.create({
+          data: { organizationId: other.id, entityType: "LEAD", key: "foreign_f", label: "Foreign", fieldType: "TEXT" }
+        });
+        const resp = await req("/api/leads", {
+          method: "POST",
+          body: {
+            name: "Foreign Field Lead",
+            customFieldValues: [
+              { customFieldId: foreignField.id, value: "hack" }
+            ]
+          }
+        });
+        assert.equal(resp.status, 400);
+      });
+
+      await t.test("25. Lead PATCH updates customFieldValues atomically and rolls back on error", async () => {
+        const reqField = await prisma.customField.findFirst({ where: { key: "lead_req_text", organizationId: org.id, active: true } });
+        const optField = await prisma.customField.findFirst({ where: { key: "lead_opt_num", organizationId: org.id, active: true } });
+
+        const createResp = await req("/api/leads", {
+          method: "POST",
+          body: {
+            name: "Lead To Update",
+            customFieldValues: [
+              { customFieldId: reqField.id, value: "Initial text" },
+              { customFieldId: optField.id, value: "10" }
+            ]
+          }
+        });
+        assert.equal(createResp.status, 201);
+        const leadId = createResp.body.id;
+
+        const updateResp = await req(`/api/leads/${leadId}`, {
+          method: "PATCH",
+          body: {
+            name: "Lead To Update Renamed",
+            customFieldValues: [
+              { customFieldId: reqField.id, value: "Updated text" },
+              { customFieldId: optField.id, value: "99" }
+            ]
+          }
+        });
+        assert.equal(updateResp.status, 200);
+
+        const vals = await prisma.customFieldValue.findMany({ where: { organizationId: org.id, entityType: "LEAD", entityId: leadId } });
+        assert.equal(vals.find(v => v.customFieldId === reqField.id).value, "Updated text");
+        assert.equal(vals.find(v => v.customFieldId === optField.id).value, "99");
+
+        const badUpdateResp = await req(`/api/leads/${leadId}`, {
+          method: "PATCH",
+          body: {
+            name: "Corrupted Name",
+            customFieldValues: [
+              { customFieldId: optField.id, value: "invalid_again" }
+            ]
+          }
+        });
+        assert.equal(badUpdateResp.status, 400);
+
+        const leadInDb = await prisma.lead.findUnique({ where: { id: leadId } });
+        assert.equal(leadInDb.name, "Lead To Update Renamed");
+      });
+
+      await t.test("26. Partner create with customFieldValues atomically creates partner and values", async () => {
+        const partnerField = await prisma.customField.create({
+          data: { organizationId: org.id, entityType: "PARTNER", key: "contract_ref", label: "Szerződés ref", fieldType: "TEXT", required: true }
+        });
+
+        const resp = await req("/api/partners", {
+          method: "POST",
+          body: {
+            type: "COMPANY",
+            name: "Partner With CF",
+            customFieldValues: [
+              { customFieldId: partnerField.id, value: "CTR-2026-001" }
+            ]
+          }
+        });
+        assert.equal(resp.status, 201);
+        const partnerId = resp.body.id;
+
+        const val = await prisma.customFieldValue.findFirst({ where: { organizationId: org.id, entityType: "PARTNER", entityId: partnerId, customFieldId: partnerField.id } });
+        assert.equal(val.value, "CTR-2026-001");
+      });
+
+      await t.test("27. Partner create missing required customField fails with 400 and rolls back", async () => {
+        const countBefore = await prisma.partner.count({ where: { organizationId: org.id } });
+        const resp = await req("/api/partners", {
+          method: "POST",
+          body: {
+            type: "COMPANY",
+            name: "Failed Partner",
+            customFieldValues: []
+          }
+        });
+        assert.equal(resp.status, 400);
+        assert.match(resp.body.message, /kitöltése kötelező/i);
+
+        const countAfter = await prisma.partner.count({ where: { organizationId: org.id } });
+        assert.equal(countAfter, countBefore);
+      });
+
+      await t.test("28. Partner PATCH updates customFieldValues atomically and rolls back on error", async () => {
+        const partnerField = await prisma.customField.findFirst({ where: { key: "contract_ref", organizationId: org.id } });
+        const partner = await prisma.partner.create({
+          data: { organizationId: org.id, type: "COMPANY", name: "Partner For Patch" }
+        });
+        await prisma.customFieldValue.create({
+          data: { organizationId: org.id, entityType: "PARTNER", entityId: partner.id, customFieldId: partnerField.id, value: "CTR-OLD" }
+        });
+
+        const patchResp = await req(`/api/partners/${partner.id}`, {
+          method: "PATCH",
+          body: {
+            name: "Partner For Patch Updated",
+            customFieldValues: [
+              { customFieldId: partnerField.id, value: "CTR-NEW" }
+            ]
+          }
+        });
+        assert.equal(patchResp.status, 200);
+        const val = await prisma.customFieldValue.findFirst({ where: { organizationId: org.id, entityType: "PARTNER", entityId: partner.id, customFieldId: partnerField.id } });
+        assert.equal(val.value, "CTR-NEW");
+
+        const badResp = await req(`/api/partners/${partner.id}`, {
+          method: "PATCH",
+          body: {
+            name: "Should Not Update",
+            customFieldValues: [
+              { customFieldId: 999999, value: "bad" }
+            ]
+          }
+        });
+        assert.equal(badResp.status, 400);
+
+        const partnerInDb = await prisma.partner.findUnique({ where: { id: partner.id } });
+        assert.equal(partnerInDb.name, "Partner For Patch Updated");
       });
     } finally {
       await server.close();

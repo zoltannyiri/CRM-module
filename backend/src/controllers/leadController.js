@@ -1,11 +1,13 @@
 import leadService from "../services/leadService.js";
+import customFieldService from "../services/customFieldService.js";
+import { normalizeCustomFieldValues } from "../validation/customFieldValidation.js";
 import { hasPermission } from "../services/permissionService.js";
 import { isModuleEnabled } from "../services/organizationModuleService.js";
 import { normalizePartnerPayload } from "../validation/partnerValidation.js";
 
 export const LEAD_STATUSES = new Set(["NEW", "CONTACTED", "QUALIFIED", "LOST"]);
 export const LEAD_SOURCES = new Set(["WEBSITE", "REFERRAL", "PHONE", "EMAIL", "SOCIAL", "OTHER"]);
-const fields = new Set(["name", "companyName", "email", "phone", "note", "status", "source", "assignedMemberId"]);
+const fields = new Set(["name", "companyName", "email", "phone", "note", "status", "source", "assignedMemberId", "customFieldValues"]);
 
 function positiveId(value) {
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
@@ -46,6 +48,12 @@ export function normalizePayload(body, { partial = false } = {}) {
     const value = body.assignedMemberId;
     if (value !== null && (typeof value !== "number" || !Number.isInteger(value) || value <= 0 || value > 2147483647)) return { error: "Érvénytelen felelős azonosító." };
     data.assignedMemberId = value;
+  }
+  if (Object.hasOwn(body, "customFieldValues")) {
+    if (body.customFieldValues !== null && !Array.isArray(body.customFieldValues)) {
+      return { error: "A customFieldValues mezőnek tömbnek kell lennie." };
+    }
+    data.customFieldValues = body.customFieldValues;
   }
   return { data };
 }
@@ -98,7 +106,33 @@ async function save(req, res, next, partial) {
     if (partial && !leadId) return res.status(400).json({ message: "Érvénytelen érdeklődő azonosító." });
     const normalized = normalizePayload(req.body, { partial });
     if (normalized.error) return res.status(400).json({ message: normalized.error });
-    const args = { organizationId: req.organization.id, actorMemberId: req.membership.id, leadId, data: normalized.data };
+
+    const activeFields = await customFieldService.getActiveCustomFields({
+      organizationId: req.organization.id,
+      entityType: "LEAD"
+    });
+
+    let customFieldValues = undefined;
+    if (!partial || normalized.data.customFieldValues !== undefined) {
+      const customValidation = normalizeCustomFieldValues(
+        normalized.data.customFieldValues,
+        activeFields,
+        { isCreate: !partial }
+      );
+      if (customValidation.error) {
+        return res.status(400).json({ message: customValidation.error });
+      }
+      customFieldValues = customValidation.data;
+    }
+
+    const { customFieldValues: _discard, ...leadData } = normalized.data;
+    const args = {
+      organizationId: req.organization.id,
+      actorMemberId: req.membership.id,
+      leadId,
+      data: leadData,
+      customFieldValues
+    };
     const lead = await (partial ? leadService.updateLead(args) : leadService.createLead(args));
     if (!lead) return res.status(404).json({ message: "Érdeklődő vagy szervezeti tag nem található." });
     return res.status(partial ? 200 : 201).json(lead);

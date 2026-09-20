@@ -103,29 +103,50 @@ async function getCustomFieldValues({ organizationId, entityType, entityId }) {
   return { fields: activeFields, values: valuesMap };
 }
 
-async function setCustomFieldValues({ organizationId, entityType, entityId, values }, client = prisma) {
-  return client.$transaction(async (tx) => {
-    const customFieldIds = values.map(v => v.customFieldId);
-
-    for (const item of values) {
-      await tx.customFieldValue.upsert({
-        where: { customFieldId_entityId: { customFieldId: item.customFieldId, entityId } },
-        update: { value: item.value },
-        create: { organizationId, customFieldId: item.customFieldId, entityType, entityId, value: item.value }
-      });
-    }
-
-    await tx.customFieldValue.deleteMany({
-      where: {
-        organizationId,
-        entityType,
-        entityId,
-        customFieldId: { notIn: customFieldIds }
-      }
+async function assertEntityExists({ organizationId, entityType, entityId }, client = prisma) {
+  if (entityType === 'LEAD') {
+    const lead = await client.lead.findFirst({
+      where: { id: entityId, organizationId },
+      select: { id: true }
     });
-    
+    return Boolean(lead);
+  }
+  if (entityType === 'PARTNER') {
+    const partner = await client.partner.findFirst({
+      where: { id: entityId, organizationId },
+      select: { id: true }
+    });
+    return Boolean(partner);
+  }
+  return false;
+}
+
+async function setCustomFieldValues({ organizationId, entityType, entityId, values }, client = prisma) {
+  const execute = async (tx) => {
+    for (const item of values) {
+      if (item.value === null || item.value === undefined || item.value === '') {
+        await tx.customFieldValue.deleteMany({
+          where: {
+            organizationId,
+            customFieldId: item.customFieldId,
+            entityId
+          }
+        });
+      } else {
+        await tx.customFieldValue.upsert({
+          where: { customFieldId_entityId: { customFieldId: item.customFieldId, entityId } },
+          update: { value: item.value },
+          create: { organizationId, customFieldId: item.customFieldId, entityType, entityId, value: item.value }
+        });
+      }
+    }
     return true;
-  });
+  };
+
+  if (typeof client.$transaction === 'function') {
+    return client.$transaction(execute);
+  }
+  return execute(client);
 }
 
 export {
@@ -136,7 +157,8 @@ export {
   updateCustomField,
   deactivateCustomField,
   getCustomFieldValues,
-  setCustomFieldValues
+  setCustomFieldValues,
+  assertEntityExists
 };
 
 export default {
@@ -147,5 +169,6 @@ export default {
   updateCustomField,
   deactivateCustomField,
   getCustomFieldValues,
-  setCustomFieldValues
+  setCustomFieldValues,
+  assertEntityExists
 };

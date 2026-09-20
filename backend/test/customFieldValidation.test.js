@@ -70,5 +70,14 @@ test("CustomField values validation enforces required, types, and options", () =
   assert.ok(normalizeCustomFieldValues([{ customFieldId: 5, value: "2026/09/20" }], fields).error);
   assert.equal(normalizeCustomFieldValues([{ customFieldId: 5, value: "2026-09-20" }], fields).data[0].value, "2026-09-20");
 
+  // Unknown customFieldId
   assert.ok(normalizeCustomFieldValues([{ customFieldId: 999, value: "test" }], fields).error);
+
+  // Duplicate customFieldId
+  assert.ok(normalizeCustomFieldValues([{ customFieldId: 2, value: "true" }, { customFieldId: 2, value: "false" }], fields).error);
+
+  // isCreate: true enforces presence of required field
+  assert.ok(normalizeCustomFieldValues([], fields, { isCreate: true }).error);
+  assert.ok(normalizeCustomFieldValues([{ customFieldId: 2, value: "true" }], fields, { isCreate: true }).error);
+  assert.equal(normalizeCustomFieldValues([{ customFieldId: 1, value: "100" }], fields, { isCreate: true }).error, undefined);
 });

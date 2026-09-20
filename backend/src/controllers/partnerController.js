@@ -1,4 +1,6 @@
 import partnerService from '../services/partnerService.js';
+import customFieldService from '../services/customFieldService.js';
+import { normalizeCustomFieldValues } from '../validation/customFieldValidation.js';
 import { buildPartnerExport, exportContentTypes } from '../services/partnerExportService.js';
 import { normalizePartnerPayload } from '../validation/partnerValidation.js';
 
@@ -75,10 +77,26 @@ async function createPartner(req, res, next) {
     const normalized = normalizePartnerPayload(req.body);
     if (normalized.error) return res.status(400).json({ message: normalized.error });
 
+    const activeFields = await customFieldService.getActiveCustomFields({
+      organizationId: req.organization.id,
+      entityType: "PARTNER"
+    });
+
+    const customValidation = normalizeCustomFieldValues(
+      normalized.data.customFieldValues,
+      activeFields,
+      { isCreate: true }
+    );
+    if (customValidation.error) {
+      return res.status(400).json({ message: customValidation.error });
+    }
+
+    const { customFieldValues: _discard, ...partnerData } = normalized.data;
     const partner = await partnerService.createPartner({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id,
-      data: normalized.data,
+      data: partnerData,
+      customFieldValues: customValidation.data
     });
 
     return res.status(201).json(partner);
@@ -93,11 +111,31 @@ async function updatePartner(req, res, next) {
     if (!partnerId) return res.status(400).json({ message: "Érvénytelen partner azonosító." });
     const normalized = normalizePartnerPayload(req.body, { partial: true });
     if (normalized.error) return res.status(400).json({ message: normalized.error });
+
+    let customFieldValues = undefined;
+    if (normalized.data.customFieldValues !== undefined) {
+      const activeFields = await customFieldService.getActiveCustomFields({
+        organizationId: req.organization.id,
+        entityType: "PARTNER"
+      });
+      const customValidation = normalizeCustomFieldValues(
+        normalized.data.customFieldValues,
+        activeFields,
+        { isCreate: false }
+      );
+      if (customValidation.error) {
+        return res.status(400).json({ message: customValidation.error });
+      }
+      customFieldValues = customValidation.data;
+    }
+
+    const { customFieldValues: _discard, ...partnerData } = normalized.data;
     const partner = await partnerService.updatePartner({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id,
       partnerId,
-      data: normalized.data,
+      data: partnerData,
+      customFieldValues
     });
 
     if (!partner) {

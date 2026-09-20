@@ -60,23 +60,11 @@ function LeadForm({ mode = "create", lead, onClose, onSaved }) {
       ...data, name: data.name.trim(), companyName: data.companyName.trim() || null,
       email: data.email.trim() || null, phone: phone || null, note: data.note.trim() || null,
       assignedMemberId: data.assignedMemberId ? Number(data.assignedMemberId) : null,
+      customFieldValues,
     };
     setSubmitting(true);
     try {
       const response = isEditing ? await apiClient.patch(`/leads/${lead.id}`, payload) : await apiClient.post("/leads", payload);
-      
-      if (customFieldValues.length > 0) {
-        try {
-          await apiClient.put("/custom-fields/values", {
-            entityType: "LEAD",
-            entityId: response.data.id,
-            values: customFieldValues,
-          });
-        } catch {
-          // ignore
-        }
-      }
-
       showSuccess(isEditing ? "Az érdeklődő sikeresen módosítva." : "Az érdeklődő sikeresen létrehozva.");
       onSaved?.(response.data);
       onClose();
