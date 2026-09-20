@@ -144,6 +144,24 @@ test("Follow-ups real database tenant, dates, permissions, Activity and concurre
       assert.equal(final.note, "Concurrent metadata"); assert.equal(final.status, "COMPLETED"); assert.ok(final.completedAt);
       assert.equal(await prisma.activity.count({ where: { entityType: "FOLLOW_UP", entityId: created.id, action: "FOLLOW_UP_COMPLETED" } }), 2);
     });
+    await t.test("delete versus complete and Lead delete versus create cannot leave partial or orphan records", async () => {
+      const created = await create();
+      const input = { ...args(), followUpId: created.id };
+      const mutationResults = await Promise.allSettled([service.deleteFollowUp(input), service.completeFollowUp(input)]);
+      assert.equal(mutationResults.filter(({ status }) => status === "fulfilled").length >= 1, true);
+      assert.equal(await prisma.followUp.count({ where: { id: created.id } }), 0);
+      assert.equal(await prisma.activity.count({ where: { entityType: "FOLLOW_UP", entityId: created.id, action: "DELETED" } }), 1);
+      assert.ok(await prisma.activity.count({ where: { entityType: "FOLLOW_UP", entityId: created.id, action: "FOLLOW_UP_COMPLETED" } }) <= 1);
+
+      const { deleteLead } = await import("../src/services/leadService.js");
+      const temporaryLead = await prisma.lead.create({ data: { organizationId: org.id, name: "Create/delete race" } });
+      await Promise.allSettled([
+        deleteLead({ organizationId: org.id, actorMemberId: owner.membership.id, leadId: temporaryLead.id }),
+        service.createFollowUp({ organizationId: org.id, actorMemberId: owner.membership.id, data: { leadId: temporaryLead.id, type: "CALL", dueAt: new Date() } }),
+      ]);
+      assert.equal(await prisma.lead.count({ where: { id: temporaryLead.id } }), 0);
+      assert.equal(await prisma.followUp.count({ where: { leadId: temporaryLead.id } }), 0);
+    });
     await t.test("Activity failure rolls back create, edit, completion and deletion", async () => {
       const failing = { $transaction: (callback) => prisma.$transaction((tx) => callback(new Proxy(tx, { get(target, key) {
         if (key === "activity") return { create: async () => { throw new Error("Activity failure"); } };
@@ -194,6 +212,8 @@ test("Follow-ups real database tenant, dates, permissions, Activity and concurre
       }
       await permissions(["ACTIVITY_VIEW", "FOLLOW_UPS_VIEW", "LEADS_VIEW", "PIPELINE_VIEW"]);
       assert.ok((await request("/api/activities?entityType=FOLLOW_UP", { token: userToken })).body.length);
+      const scopedActivities = (await request(`/api/activities?entityType=FOLLOW_UP&entityId=${record.id}`, { token: userToken })).body;
+      assert.ok(scopedActivities.length); assert.ok(scopedActivities.every(({ entityType, entityId }) => entityType === "FOLLOW_UP" && entityId === record.id));
       const dashboard = (await request("/api/dashboard?timeZone=Europe%2FBudapest", { token: userToken })).body;
       assert.ok(dashboard.followUps); assert.ok(dashboard.followUps.items.every(({ assignedMemberId }) => assignedMemberId === user.membership.id));
       assert.deepEqual(Object.keys((await boardCard()).nextFollowUp), ["dueAt"]);
