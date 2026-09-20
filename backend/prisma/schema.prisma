@@ -60,6 +60,7 @@ enum ActivityAction {
   PRIORITY_CHANGED
   PIPELINE_STAGE_CHANGED
   FOLLOW_UP_COMPLETED
+  LEAD_CONVERTED
 }
 
 enum ModuleKey {
@@ -112,6 +113,7 @@ enum PermissionKey {
   LEADS_CREATE
   LEADS_EDIT
   LEADS_DELETE
+  LEADS_CONVERT
 
   PIPELINE_VIEW
   PIPELINE_CREATE
@@ -194,6 +196,7 @@ model OrganizationMember {
   createdOffers Offer[]
   assignedLeads Lead[] @relation("LeadAssignee")
   createdLeads Lead[] @relation("LeadCreator")
+  convertedLeads Lead[] @relation("LeadConverter")
   assignedFollowUps FollowUp[] @relation("FollowUpAssignee")
   createdFollowUps FollowUp[] @relation("FollowUpCreator")
 
@@ -289,12 +292,14 @@ model Partner {
   contacts Contact[]
   projects Project[]
   offers   Offer[]
+  convertedLeads Lead[] @relation("LeadConvertedPartner")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
   @@index([organizationId, name])
+  @@unique([id, organizationId])
 }
 
 model Contact {
@@ -504,6 +509,11 @@ model Lead {
   assignedMember OrganizationMember? @relation("LeadAssignee", fields: [assignedMemberId], references: [id], onDelete: SetNull)
   createdByMemberId Int?
   createdByMember OrganizationMember? @relation("LeadCreator", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  convertedAt DateTime? @db.Timestamptz(3)
+  convertedPartnerId Int?
+  convertedPartner Partner? @relation("LeadConvertedPartner", fields: [convertedPartnerId, organizationId], references: [id, organizationId], onDelete: SetNull)
+  convertedByMemberId Int?
+  convertedByMember OrganizationMember? @relation("LeadConverter", fields: [convertedByMemberId, organizationId], references: [id, organizationId], onDelete: SetNull)
   pipelinePosition LeadPipelinePosition?
   followUps FollowUp[]
   createdAt DateTime @default(now())
@@ -516,6 +526,8 @@ model Lead {
   @@unique([id, organizationId])
   @@index([assignedMemberId])
   @@index([createdByMemberId])
+  @@index([convertedPartnerId, organizationId])
+  @@index([convertedByMemberId, organizationId])
 }
 
 model Pipeline {

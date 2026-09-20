@@ -5,6 +5,8 @@ import apiClient from "../api/apiClient.js";
 import LeadListComponent from "../components/lead/LeadListComponent.jsx";
 import LeadFormComponent from "../components/lead/LeadFormComponent.jsx";
 import LeadShowComponent from "../components/lead/LeadShowComponent.jsx";
+import LeadConversionFormComponent from "../components/lead/LeadConversionFormComponent.jsx";
+import { conversionDestination } from "../components/lead/leadConversion.js";
 import RelatedFollowUpsComponent from "../components/followUp/RelatedFollowUpsComponent.jsx";
 import { leadStatusLabels, leadSourceLabels, memberName } from "../components/lead/leadDisplay.js";
 import Topbar from "../components/Topbar.jsx";
@@ -28,6 +30,7 @@ export default function LeadPage() {
   const [membersLoading, setMembersLoading] = useState(true);
   const [membersError, setMembersError] = useState("");
   const [form, setForm] = useState(null);
+  const [conversionLead, setConversionLead] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const canCreate = hasPermission("LEADS_CREATE");
 
@@ -49,12 +52,18 @@ export default function LeadPage() {
     } catch (error) { showError(error.response?.data?.message || "Az érdeklődő nem tölthető be."); }
   };
   const drawer = form && <LeadFormComponent {...form} onClose={() => setForm(null)} onSaved={() => setReloadKey((value) => value + 1)} />;
+  const conversionDrawer = conversionLead && <LeadConversionFormComponent lead={conversionLead} onClose={() => setConversionLead(null)} onConverted={({ partner }) => {
+    setReloadKey((value) => value + 1);
+    const destination = conversionDestination({ partner }, hasPermission("PARTNERS_VIEW"));
+    if (destination) navigate(destination);
+  }} />;
 
   if (id) return <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">
     <Topbar />
     <div className="flex items-center gap-3 border-b border-[#e3e8e6] bg-white px-5 py-3 lg:px-7"><button type="button" onClick={() => navigate("/lead")} className={lightControl}>Vissza az érdeklődőkhöz</button><span className="h-4 w-px bg-[#dbe1df]" /><h1 className="text-sm font-semibold">Érdeklődő adatlap</h1></div>
-    <div className="px-5 py-6 lg:px-7"><TabView className={tabsClass}><TabPanel header="Alapadatok"><LeadShowComponent key={`${id}-${reloadKey}`} leadId={id} onEdit={openEdit} /></TabPanel>{hasModule("FOLLOW_UPS") && hasPermission("FOLLOW_UPS_VIEW") && <TabPanel header="Utánkövetések"><RelatedFollowUpsComponent key={id} leadId={id} /></TabPanel>}</TabView></div>
+    <div className="px-5 py-6 lg:px-7"><TabView className={tabsClass}><TabPanel header="Alapadatok"><LeadShowComponent key={`${id}-${reloadKey}`} leadId={id} onEdit={openEdit} onConvert={setConversionLead} /></TabPanel>{hasModule("FOLLOW_UPS") && hasPermission("FOLLOW_UPS_VIEW") && <TabPanel header="Utánkövetések"><RelatedFollowUpsComponent key={id} leadId={id} /></TabPanel>}</TabView></div>
     {drawer}
+    {conversionDrawer}
   </div>;
 
   return <div className="min-h-dvh bg-[#f3f5f6] text-[#253238]">

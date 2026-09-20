@@ -50,19 +50,11 @@ async function getPartnerById({ partnerId, organizationId }) {
   });
 }
 
-async function createPartner({ organizationId, actorMemberId, note, address, taxNumber, website, phone, email, name, type }) {
-  return prisma.$transaction(async (tx) => {
+export async function createPartnerInTransaction({ organizationId, actorMemberId, data }, tx) {
     const partner = await tx.partner.create({
       data: {
         organizationId,
-        note,
-        address,
-        taxNumber,
-        website,
-        phone,
-        email,
-        name,
-        type,
+        ...data,
       },
       include: {
         contacts: true,
@@ -84,7 +76,10 @@ async function createPartner({ organizationId, actorMemberId, note, address, tax
     );
 
     return partner;
-  });
+}
+
+async function createPartner({ organizationId, actorMemberId, data }) {
+  return prisma.$transaction((tx) => createPartnerInTransaction({ organizationId, actorMemberId, data }, tx));
 }
 
 async function updatePartner({ organizationId, actorMemberId, partnerId, data }) {

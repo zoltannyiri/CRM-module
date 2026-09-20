@@ -49,7 +49,7 @@ test("Pipeline migration deploy upgrades pre-Pipeline data without resetting cus
       members.push(await prisma.organizationMember.create({ data: { organizationId: org.id, userId: user.id, role } }));
     }
     await prisma.organizationMemberPermission.create({ data: { organizationMemberId: members[2].id, permission: "LEADS_VIEW" } });
-    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Existing Lead", status: "QUALIFIED", email: "preserve@example.invalid" } });
+    const [lead] = await prisma.$queryRawUnsafe(`INSERT INTO "${schema}"."Lead" ("organizationId", "name", "status", "source", "email", "createdAt", "updatedAt") VALUES ($1, $2, 'QUALIFIED', 'OTHER', $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING "id", "name", "status", "email"`, org.id, "Existing Lead", "preserve@example.invalid");
     for (const name of (await readdir(source)).filter((name) => name >= migrationName && name !== "migration_lock.toml")) await cp(path.join(source, name), path.join(migrations, name), { recursive: true });
     assert.match((await deploy()).stdout, /20260913120000_add_pipeline/);
     assert.match((await deploy()).stdout, /No pending migrations/);
@@ -64,7 +64,9 @@ test("Pipeline migration deploy upgrades pre-Pipeline data without resetting cus
       if (member.role === "USER") assert.equal(permissions.includes("LEADS_VIEW"), true);
       assert.equal(permissions.includes("LEADS_EDIT"), false);
     }
-    assert.deepEqual(await prisma.lead.findUnique({ where: { id: lead.id } }), lead);
+    const upgradedLead = await prisma.lead.findUnique({ where: { id: lead.id } });
+    for (const key of ["id", "name", "status", "email"]) assert.equal(upgradedLead[key], lead[key]);
+    assert.equal(upgradedLead.convertedAt, null); assert.equal(upgradedLead.convertedPartnerId, null); assert.equal(upgradedLead.convertedByMemberId, null);
     assert.equal(await prisma.leadPipelinePosition.count(), 0);
   } finally {
     await prisma.$disconnect();

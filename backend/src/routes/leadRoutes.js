@@ -8,6 +8,7 @@ import requirePermission from "../middleware/requirePermission.js";
 const router = express.Router();
 router.use(authMiddleware, requireOrganization, requireModule("LEADS"));
 router.get("/", requirePermission("LEADS_VIEW"), leadController.getLeads);
+router.post("/:id/convert", requireModule("PARTNERS"), requirePermission("LEADS_CONVERT"), requirePermission("PARTNERS_CREATE"), leadController.convertLead);
 router.get("/:id", requirePermission("LEADS_VIEW"), leadController.getLeadById);
 router.post("/", requirePermission("LEADS_CREATE"), leadController.createLead);
 router.patch("/:id", requirePermission("LEADS_EDIT"), leadController.updateLead);

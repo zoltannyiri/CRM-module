@@ -7,7 +7,7 @@ import { useToast } from "../hooks/useToast.js";
 const groups = [
   { title: "Utánkövetések", module: "FOLLOW_UPS", permissions: [["FOLLOW_UPS_VIEW", "Megtekintés"], ["FOLLOW_UPS_CREATE", "Létrehozás"], ["FOLLOW_UPS_EDIT", "Szerkesztés"], ["FOLLOW_UPS_DELETE", "Törlés"], ["FOLLOW_UPS_COMPLETE", "Teljesítés"]] },
   { title: "Pipeline", module: "PIPELINE", permissions: [["PIPELINE_VIEW", "Megtekintés"], ["PIPELINE_CREATE", "Létrehozás"], ["PIPELINE_EDIT", "Szerkesztés"], ["PIPELINE_DELETE", "Törlés"]] },
-  { title: "Érdeklődők", module: "LEADS", permissions: [["LEADS_VIEW", "Megtekintés"], ["LEADS_CREATE", "Létrehozás"], ["LEADS_EDIT", "Módosítás"], ["LEADS_DELETE", "Törlés"]] },
+  { title: "Érdeklődők", module: "LEADS", permissions: [["LEADS_VIEW", "Megtekintés"], ["LEADS_CREATE", "Létrehozás"], ["LEADS_EDIT", "Módosítás"], ["LEADS_DELETE", "Törlés"], ["LEADS_CONVERT", "Érdeklődő partnerré alakítása"]] },
   { title: "Partnerek", module: "PARTNERS", permissions: [["PARTNERS_VIEW", "Megtekintés"], ["PARTNERS_CREATE", "Létrehozás"], ["PARTNERS_EDIT", "Módosítás"], ["PARTNERS_DELETE", "Törlés"]] },
   { title: "Projektek", module: "PROJECTS", permissions: [["PROJECTS_VIEW", "Megtekintés"], ["PROJECTS_CREATE", "Létrehozás"], ["PROJECTS_EDIT", "Módosítás"], ["PROJECTS_DELETE", "Törlés"]] },
   { title: "Feladatok", module: "TASKS", permissions: [["TASKS_VIEW", "Megtekintés"], ["TASKS_CREATE", "Létrehozás"], ["TASKS_EDIT", "Módosítás"], ["TASKS_DELETE", "Törlés"], ["TASKS_ASSIGN", "Felelős hozzárendelése"]] },

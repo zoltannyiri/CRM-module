@@ -35,11 +35,13 @@ test("Leads real database CRUD, authorization and migration", {
     mock.module("../src/lib/prisma.js", { defaultExport: prisma });
     const { default: leads } = await import("../src/services/leadService.js");
     const { default: leadRoutes } = await import("../src/routes/leadRoutes.js");
+    const { default: partnerRoutes } = await import("../src/routes/partnerRoutes.js");
     const { default: activityRoutes } = await import("../src/routes/activityRoutes.js");
     const { generateAccessToken } = await import("../src/utils/token.js");
     const org = await prisma.organization.create({ data: { name: "Leads audit", slug: schema } });
     const other = await prisma.organization.create({ data: { name: "Foreign", slug: schema + "_other" } });
     await prisma.organizationModule.create({ data: { organizationId: org.id, module: "LEADS", enabled: true } });
+    await prisma.organizationModule.create({ data: { organizationId: org.id, module: "PARTNERS", enabled: true } });
     const makeMember = async (role, organizationId = org.id) => {
       const user = await prisma.user.create({ data: { email: randomUUID() + "@example.invalid", passwordHash: "unused", firstName: "Audit", lastName: role } });
       const membership = await prisma.organizationMember.create({ data: { userId: user.id, organizationId, role } });
@@ -55,8 +57,12 @@ test("Leads real database CRUD, authorization and migration", {
     const app = express();
     app.use(express.json());
     app.use("/api/leads", leadRoutes);
+    app.use("/api/partners", partnerRoutes);
     app.use("/api/activities", activityRoutes);
-    app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ message: "Audit technical error" }));
+    app.use((error, _req, res, _next) => {
+      const status = error.statusCode || 500;
+      return res.status(status).json({ message: status >= 500 ? "Audit technical error" : error.message, ...(status < 500 && error.code && { code: error.code }) });
+    });
     const server = app.listen(0, "127.0.0.1");
     await once(server, "listening");
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -189,6 +195,95 @@ test("Leads real database CRUD, authorization and migration", {
         assert.ok(results.every((lead) => lead.assignedMemberId === admin.membership.id));
         assert.equal(await prisma.activity.count({ where: { entityType: "LEAD", entityId: own.id, action: "ASSIGNED" } }), before + 1);
       });
+      await t.test("conversion enforces permissions, both modules, tenant and strict Partner payload", async () => {
+        const candidate = await prisma.lead.create({ data: { organizationId: org.id, name: "Conversion candidate", companyName: "Candidate Kft.", email: "candidate@example.com" } });
+        const conversion = { partner: { type: "COMPANY", name: "Candidate Kft.", email: "candidate@example.com" } };
+        await setPermissions(["LEADS_CONVERT"]);
+        assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
+        await setPermissions(["PARTNERS_CREATE"]);
+        assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
+        await setPermissions(["LEADS_CONVERT", "PARTNERS_CREATE"]);
+        await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } }, data: { enabled: false } });
+        assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
+        await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } }, data: { enabled: true } });
+        assert.equal((await request(`/api/leads/${foreign.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 404);
+        for (const body of [null, {}, { partner: null }, { partner: { name: "" } }, { partner: { name: "X", organizationId: other.id } }, { partner: { name: "X", createdByMemberId: owner.membership.id } }, { partner: { name: "X", type: "INVALID" } }]) {
+          assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body })).status, 400);
+        }
+        const converted = await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion });
+        assert.equal(converted.status, 201);
+        assert.equal(Object.hasOwn(converted.body, "partner"), false);
+        assert.equal(Object.hasOwn(converted.body.lead, "convertedPartner"), false);
+        assert.ok(converted.body.lead.convertedAt);
+      });
+      await t.test("conversion is atomic, concurrent-safe and has exactly two domain activities", async () => {
+        const candidate = await prisma.lead.create({ data: { organizationId: org.id, name: "Parallel", companyName: "Parallel Kft." } });
+        const before = await prisma.partner.count({ where: { organizationId: org.id } });
+        const body = { partner: { type: "COMPANY", name: "Parallel Kft." } };
+        const results = await Promise.all([
+          request(`/api/leads/${candidate.id}/convert`, { method: "POST", body }),
+          request(`/api/leads/${candidate.id}/convert`, { method: "POST", body }),
+        ]);
+        assert.deepEqual(results.map(({ status }) => status).sort(), [201, 409]);
+        assert.equal(results.find(({ status }) => status === 409).body.code, "LEAD_ALREADY_CONVERTED");
+        assert.equal(await prisma.partner.count({ where: { organizationId: org.id } }), before + 1);
+        const stored = await prisma.lead.findUnique({ where: { id: candidate.id } });
+        assert.ok(stored.convertedAt); assert.ok(stored.convertedPartnerId); assert.equal(stored.convertedByMemberId, owner.membership.id);
+        assert.equal(await prisma.activity.count({ where: { entityType: "LEAD", entityId: candidate.id, action: "LEAD_CONVERTED" } }), 1);
+        assert.equal(await prisma.activity.count({ where: { entityType: "PARTNER", entityId: stored.convertedPartnerId, action: "CREATED" } }), 1);
+
+        const failingCandidate = await prisma.lead.create({ data: { organizationId: org.id, name: "Rollback conversion" } });
+        const partnerCount = await prisma.partner.count();
+        let activityWrites = 0;
+        const failing = { $transaction: (callback) => prisma.$transaction((tx) => callback(new Proxy(tx, { get(target, key) {
+          if (key === "activity") return { create: async (...parameters) => {
+            activityWrites += 1;
+            if (activityWrites === 2) throw new Error("Activity failure");
+            return target.activity.create(...parameters);
+          } };
+          const value = target[key]; return typeof value === "function" ? value.bind(target) : value;
+        } }))) };
+        await assert.rejects(leads.convertLead({ organizationId: org.id, actorMemberId: owner.membership.id, leadId: failingCandidate.id, partner: { type: "COMPANY", name: "Orphan forbidden" } }, failing), /Activity failure/);
+        assert.equal(await prisma.partner.count(), partnerCount);
+        assert.equal((await prisma.lead.findUnique({ where: { id: failingCandidate.id } })).convertedAt, null);
+      });
+      await t.test("conversion preserves Pipeline and Follow-ups; delete lifecycles preserve history and Partner", async () => {
+        const pipeline = await prisma.pipeline.create({ data: { organizationId: org.id, name: "Conversion pipeline", stages: { create: { name: "Stage", position: 0 } } }, include: { stages: true } });
+        const candidate = await prisma.lead.create({ data: { organizationId: org.id, name: "Lifecycle" } });
+        await prisma.leadPipelinePosition.create({ data: { organizationId: org.id, leadId: candidate.id, pipelineId: pipeline.id, pipelineStageId: pipeline.stages[0].id } });
+        const followUp = await prisma.followUp.create({ data: { organizationId: org.id, leadId: candidate.id, type: "CALL", status: "OPEN", dueAt: new Date("2026-10-01T10:00:00Z") } });
+        const result = await request(`/api/leads/${candidate.id}/convert`, { method: "POST", body: { partner: { name: "Lifecycle partner" } } });
+        assert.equal(result.status, 201);
+        const stored = await prisma.lead.findUnique({ where: { id: candidate.id } });
+        assert.equal((await prisma.leadPipelinePosition.findUnique({ where: { leadId: candidate.id } })).pipelineStageId, pipeline.stages[0].id);
+        assert.equal((await prisma.followUp.findUnique({ where: { id: followUp.id } })).status, "OPEN");
+        const partnerId = stored.convertedPartnerId;
+        await assert.rejects(prisma.lead.update({ where: { id: candidate.id }, data: { convertedPartnerId: await prisma.partner.create({ data: { organizationId: other.id, name: "Foreign conversion target" } }).then(({ id }) => id) } }));
+        await assert.rejects(prisma.lead.update({ where: { id: candidate.id }, data: { convertedByMemberId: foreignMember.membership.id } }));
+        await prisma.partner.delete({ where: { id: partnerId } });
+        const afterPartnerDelete = await prisma.lead.findUnique({ where: { id: candidate.id } });
+        assert.ok(afterPartnerDelete.convertedAt); assert.equal(afterPartnerDelete.convertedPartnerId, null);
+
+        const deleteCandidate = await prisma.lead.create({ data: { organizationId: org.id, name: "Delete converted Lead" } });
+        const converted = await leads.convertLead({ organizationId: org.id, actorMemberId: owner.membership.id, leadId: deleteCandidate.id, partner: { type: "PERSON", name: "Surviving partner" } });
+        const survivingPartnerId = converted.partner?.id || (await prisma.lead.findUnique({ where: { id: deleteCandidate.id } })).convertedPartnerId;
+        await leads.deleteLead({ organizationId: org.id, actorMemberId: owner.membership.id, leadId: deleteCandidate.id });
+        assert.ok(await prisma.partner.findUnique({ where: { id: survivingPartnerId } }));
+
+        const converter = await makeMember("USER");
+        const actorCandidate = await prisma.lead.create({ data: { organizationId: org.id, name: "Actor lifecycle" } });
+        await leads.convertLead({ organizationId: org.id, actorMemberId: converter.membership.id, leadId: actorCandidate.id, partner: { type: "PERSON", name: "Actor partner" } });
+        await prisma.organizationMember.delete({ where: { id: converter.membership.id } });
+        const afterMemberDelete = await prisma.lead.findUnique({ where: { id: actorCandidate.id } });
+        assert.ok(afterMemberDelete.convertedAt); assert.equal(afterMemberDelete.convertedByMemberId, null);
+      });
+      await t.test("normal Partner create remains strict and functional", async () => {
+        await setPermissions(["PARTNERS_CREATE"]);
+        assert.equal((await request("/api/partners", { token: userToken, method: "POST", body: { name: " Normal partner ", type: "COMPANY" } })).status, 201);
+        for (const body of [{ name: "" }, { name: "X", organizationId: org.id }, { name: "X", email: "invalid" }]) {
+          assert.equal((await request("/api/partners", { token: userToken, method: "POST", body })).status, 400);
+        }
+      });
       await t.test("authorized delete removes lead and records activity", async () => {
         await setPermissions(["LEADS_VIEW", "LEADS_DELETE"]);
         assert.equal((await request(`/api/leads/${own.id}`, { token: userToken, method: "DELETE" })).status, 200);
@@ -220,6 +315,18 @@ test("Leads real database CRUD, authorization and migration", {
         assert.equal((await prisma.organizationModule.findUnique({ where: { organizationId_module: { organizationId: org.id, module: "LEADS" } } })).enabled, false);
       } finally { connection.release(); }
     });
+    await t.test("conversion permission backfill is idempotent and leaves OWNER implicit", async () => {
+      await prisma.organizationMemberPermission.deleteMany({ where: { permission: "LEADS_CONVERT" } });
+      const sql = await readFile("prisma/migrations/20260920090100_add_lead_conversion/migration.sql", "utf8");
+      const backfill = sql.slice(sql.indexOf('INSERT INTO "OrganizationMemberPermission"'));
+      const connection = await pool.connect();
+      try {
+        await connection.query(`SET search_path TO "${schema}"`);
+        await connection.query(backfill); await connection.query(backfill);
+      } finally { connection.release(); }
+      for (const member of [admin, user]) assert.equal(await prisma.organizationMemberPermission.count({ where: { organizationMemberId: member.membership.id, permission: "LEADS_CONVERT" } }), 1);
+      assert.equal(await prisma.organizationMemberPermission.count({ where: { organizationMemberId: owner.membership.id, permission: "LEADS_CONVERT" } }), 0);
+    });
     await t.test("new organizations and members receive centralized Leads defaults", async () => {
       const { initializeOrganizationModules } = await import("../src/services/organizationModuleService.js");
       const { initializeMemberPermissions, getEffectivePermissions } = await import("../src/services/permissionService.js");
@@ -230,7 +337,7 @@ test("Leads real database CRUD, authorization and migration", {
         const member = await makeMember(role, fresh.id);
         await initializeMemberPermissions(member.membership.id, role);
         const effective = await getEffectivePermissions(member.membership);
-        assert.ok(["LEADS_VIEW", "LEADS_CREATE", "LEADS_EDIT", "LEADS_DELETE"].every((key) => effective.includes(key)));
+        assert.ok(["LEADS_VIEW", "LEADS_CREATE", "LEADS_EDIT", "LEADS_DELETE", "LEADS_CONVERT"].every((key) => effective.includes(key)));
         if (role === "OWNER") assert.equal(await prisma.organizationMemberPermission.count({ where: { organizationMemberId: member.membership.id } }), 0);
       }
     });

@@ -12,3 +12,6 @@ export function memberName(member) {
 export function formatLeadDate(value) {
   return value ? new Date(value).toLocaleDateString("hu-HU") : "—";
 }
+export function formatLeadDateTime(value) {
+  return value ? new Intl.DateTimeFormat("hu-HU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+}

@@ -43,14 +43,16 @@ test("Follow-up migrations upgrade existing pre-FollowUp data and preserve custo
       members.push(await prisma.organizationMember.create({ data: { organizationId: org.id, userId: user.id, role } }));
     }
     await prisma.organizationMemberPermission.create({ data: { organizationMemberId: members[2].id, permission: "LEADS_VIEW" } });
-    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Existing Lead", status: "QUALIFIED" } });
+    const [lead] = await prisma.$queryRawUnsafe(`INSERT INTO "${schema}"."Lead" ("organizationId", "name", "status", "source", "createdAt", "updatedAt") VALUES ($1, $2, 'QUALIFIED', 'OTHER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING "id", "name", "status"`, org.id, "Existing Lead");
     const pipeline = await prisma.pipeline.create({ data: { organizationId: org.id, name: "Custom existing Pipeline", isDefault: true, stages: { create: [{ name: "Custom stage", position: 1 }] } }, include: { stages: true } });
     await prisma.leadPipelinePosition.create({ data: { organizationId: org.id, leadId: lead.id, pipelineId: pipeline.id, pipelineStageId: pipeline.stages[0].id } });
     const position = await prisma.leadPipelinePosition.findUnique({ where: { leadId: lead.id } });
     for (const name of (await readdir(source)).filter((name) => name >= cutoff && name !== "migration_lock.toml")) await cp(path.join(source, name), path.join(migrations, name), { recursive: true });
     assert.match((await deploy()).stdout, /20260914090000_add_follow_ups/);
     assert.match((await deploy()).stdout, /No pending migrations/);
-    assert.deepEqual(await prisma.lead.findUnique({ where: { id: lead.id } }), lead);
+    const upgradedLead = await prisma.lead.findUnique({ where: { id: lead.id } });
+    for (const key of ["id", "name", "status"]) assert.equal(upgradedLead[key], lead[key]);
+    assert.equal(upgradedLead.convertedAt, null); assert.equal(upgradedLead.convertedPartnerId, null); assert.equal(upgradedLead.convertedByMemberId, null);
     assert.deepEqual(await prisma.pipeline.findUnique({ where: { id: pipeline.id }, include: { stages: true } }), pipeline);
     assert.deepEqual(await prisma.leadPipelinePosition.findUnique({ where: { leadId: lead.id } }), position);
     assert.equal(await prisma.followUp.count(), 0);

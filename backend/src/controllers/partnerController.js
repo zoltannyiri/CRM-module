@@ -1,5 +1,12 @@
 import partnerService from '../services/partnerService.js';
 import { buildPartnerExport, exportContentTypes } from '../services/partnerExportService.js';
+import { normalizePartnerPayload } from '../validation/partnerValidation.js';
+
+function positiveId(value) {
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id <= 2147483647 ? id : null;
+}
 
 async function getPartners(req, res, next) {
   try {
@@ -15,7 +22,8 @@ async function getPartners(req, res, next) {
 
 async function getPartnerById(req, res, next) {
   try {
-    const partnerId = Number(req.params.id);
+    const partnerId = positiveId(req.params.id);
+    if (!partnerId) return res.status(400).json({ message: "Érvénytelen partner azonosító." });
     const partner = await partnerService.getPartnerById({
       organizationId: req.organization.id,
       partnerId,
@@ -64,23 +72,13 @@ async function exportPartners(req, res, next) {
 
 async function createPartner(req, res, next) {
   try {
-    const { name, email, phone, type, address, website, taxNumber, note } = req.body;
-
-    if (!name?.trim()) {
-      return res.status(400).json({ message: 'Name is required' });
-    }
+    const normalized = normalizePartnerPayload(req.body);
+    if (normalized.error) return res.status(400).json({ message: normalized.error });
 
     const partner = await partnerService.createPartner({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id,
-      name: name.trim(),
-      phone,
-      email,
-      address,
-      taxNumber,
-      note,
-      website,
-      type,
+      data: normalized.data,
     });
 
     return res.status(201).json(partner);
@@ -91,12 +89,15 @@ async function createPartner(req, res, next) {
 
 async function updatePartner(req, res, next) {
   try {
-    const partnerId = Number(req.params.id);
+    const partnerId = positiveId(req.params.id);
+    if (!partnerId) return res.status(400).json({ message: "Érvénytelen partner azonosító." });
+    const normalized = normalizePartnerPayload(req.body, { partial: true });
+    if (normalized.error) return res.status(400).json({ message: normalized.error });
     const partner = await partnerService.updatePartner({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id,
       partnerId,
-      data: req.body,
+      data: normalized.data,
     });
 
     if (!partner) {
@@ -111,7 +112,8 @@ async function updatePartner(req, res, next) {
 
 async function deletePartner(req, res, next) {
   try {
-    const partnerId = Number(req.params.id);
+    const partnerId = positiveId(req.params.id);
+    if (!partnerId) return res.status(400).json({ message: "Érvénytelen partner azonosító." });
     const partner = await partnerService.deletePartner({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id,

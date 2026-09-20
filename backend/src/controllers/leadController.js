@@ -1,4 +1,7 @@
 import leadService from "../services/leadService.js";
+import { hasPermission } from "../services/permissionService.js";
+import { isModuleEnabled } from "../services/organizationModuleService.js";
+import { normalizePartnerPayload } from "../validation/partnerValidation.js";
 
 export const LEAD_STATUSES = new Set(["NEW", "CONTACTED", "QUALIFIED", "LOST"]);
 export const LEAD_SOURCES = new Set(["WEBSITE", "REFERRAL", "PHONE", "EMAIL", "SOCIAL", "OTHER"]);
@@ -8,6 +11,10 @@ function positiveId(value) {
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
   const id = Number(value);
   return Number.isSafeInteger(id) && id <= 2147483647 ? id : null;
+}
+
+async function canViewConvertedPartner(req) {
+  return await isModuleEnabled(req.organization.id, "PARTNERS") && await hasPermission(req.membership, "PARTNERS_VIEW");
 }
 
 export function normalizePayload(body, { partial = false } = {}) {
@@ -71,7 +78,7 @@ async function getLeads(req, res, next) {
   try {
     const normalized = normalizeFilters(req.query);
     if (normalized.error) return res.status(400).json({ message: normalized.error });
-    return res.json(await leadService.getLeads({ organizationId: req.organization.id, ...normalized.data }));
+    return res.json(await leadService.getLeads({ organizationId: req.organization.id, includeConvertedPartner: await canViewConvertedPartner(req), ...normalized.data }));
   } catch (error) { return next(error); }
 }
 
@@ -79,7 +86,7 @@ async function getLeadById(req, res, next) {
   try {
     const leadId = positiveId(req.params.id);
     if (!leadId) return res.status(400).json({ message: "Érvénytelen érdeklődő azonosító." });
-    const lead = await leadService.getLeadById({ organizationId: req.organization.id, leadId });
+    const lead = await leadService.getLeadById({ organizationId: req.organization.id, leadId, includeConvertedPartner: await canViewConvertedPartner(req) });
     if (!lead) return res.status(404).json({ message: "Érdeklődő nem található." });
     return res.json(lead);
   } catch (error) { return next(error); }
@@ -109,4 +116,25 @@ async function deleteLead(req, res, next) {
     return res.json({ message: "Érdeklődő törölve." });
   } catch (error) { return next(error); }
 }
-export default { getLeads, getLeadById, createLead, updateLead, deleteLead };
+
+async function convertLead(req, res, next) {
+  try {
+    const leadId = positiveId(req.params.id);
+    if (!leadId) return res.status(400).json({ message: "Érvénytelen érdeklődő azonosító." });
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) || Object.keys(req.body).length !== 1 || !Object.hasOwn(req.body, "partner")) {
+      return res.status(400).json({ message: "Érvénytelen konverziós adatok." });
+    }
+    const normalized = normalizePartnerPayload(req.body.partner);
+    if (normalized.error) return res.status(400).json({ message: normalized.error });
+    const includeConvertedPartner = await hasPermission(req.membership, "PARTNERS_VIEW");
+    const result = await leadService.convertLead({
+      organizationId: req.organization.id,
+      actorMemberId: req.membership.id,
+      leadId,
+      partner: normalized.data,
+      includeConvertedPartner,
+    });
+    return res.status(201).json(result);
+  } catch (error) { return next(error); }
+}
+export default { getLeads, getLeadById, createLead, updateLead, deleteLead, convertLead };

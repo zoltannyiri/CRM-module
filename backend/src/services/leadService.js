@@ -1,15 +1,17 @@
 import prisma from "../lib/prisma.js";
 import activityService from "./activityService.js";
+import { createPartnerInTransaction } from "./partnerService.js";
 
 const memberSelect = { id: true, user: { select: { firstName: true, lastName: true } } };
-const leadSelect = {
+export function buildLeadSelect({ includeConvertedPartner = false } = {}) { return {
   id: true, name: true, companyName: true, email: true, phone: true, status: true,
-  source: true, note: true, assignedMemberId: true, createdAt: true, updatedAt: true,
+  source: true, note: true, assignedMemberId: true, convertedAt: true, createdAt: true, updatedAt: true,
   assignedMember: { select: memberSelect },
   createdByMember: { select: { user: { select: { firstName: true, lastName: true } } } },
-};
+  ...(includeConvertedPartner && { convertedPartner: { select: { id: true, name: true } } }),
+}; }
 
-export async function getLeads({ organizationId, status, source, assignedMemberId, search = "", sortDirection = "desc" }, client = prisma) {
+export async function getLeads({ organizationId, status, source, assignedMemberId, search = "", sortDirection = "desc", includeConvertedPartner = false }, client = prisma) {
   const term = search.trim();
   return client.lead.findMany({
     where: {
@@ -19,13 +21,13 @@ export async function getLeads({ organizationId, status, source, assignedMemberI
       ...(assignedMemberId !== undefined && { assignedMemberId }),
       ...(term && { OR: ["name", "companyName", "email", "phone"].map((field) => ({ [field]: { contains: term, mode: "insensitive" } })) }),
     },
-    select: leadSelect,
+    select: buildLeadSelect({ includeConvertedPartner }),
     orderBy: [{ createdAt: sortDirection }, { id: sortDirection }],
   });
 }
 
-export async function getLeadById({ organizationId, leadId }, client = prisma) {
-  return client.lead.findFirst({ where: { id: leadId, organizationId }, select: leadSelect });
+export async function getLeadById({ organizationId, leadId, includeConvertedPartner = false }, client = prisma) {
+  return client.lead.findFirst({ where: { id: leadId, organizationId }, select: buildLeadSelect({ includeConvertedPartner }) });
 }
 
 async function validMember(organizationId, memberId, tx) {
@@ -44,7 +46,7 @@ export async function createLead(args, client = prisma) {
   return client.$transaction(async (tx) => {
     if (!(await validMember(args.organizationId, args.data.assignedMemberId, tx))) return null;
     if (!(await validMember(args.organizationId, args.actorMemberId, tx))) return null;
-    const lead = await tx.lead.create({ data: { ...args.data, organizationId: args.organizationId, createdByMemberId: args.actorMemberId || null }, select: leadSelect });
+    const lead = await tx.lead.create({ data: { ...args.data, organizationId: args.organizationId, createdByMemberId: args.actorMemberId || null }, select: buildLeadSelect() });
     await log(tx, args, lead, "CREATED", "Érdeklődő létrehozva");
     if (lead.assignedMemberId !== null) await log(tx, args, lead, "ASSIGNED", "Érdeklődő felelőse megváltozott", { oldAssigneeMemberId: null, newAssigneeMemberId: lead.assignedMemberId });
     return lead;
@@ -60,7 +62,7 @@ export async function updateLead(args, client = prisma) {
     if (!(await validMember(args.organizationId, args.data.assignedMemberId, tx))) return null;
     const changedFields = Object.keys(args.data).filter((key) => args.data[key] !== existing[key]);
     if (!changedFields.length) return existing;
-    const lead = await tx.lead.update({ where: { id: args.leadId, organizationId: args.organizationId }, data: args.data, select: leadSelect });
+    const lead = await tx.lead.update({ where: { id: args.leadId, organizationId: args.organizationId }, data: args.data, select: buildLeadSelect() });
     if (changedFields.includes("status")) await log(tx, args, lead, "STATUS_CHANGED", "Érdeklődő státusza megváltozott", { field: "status", oldValue: existing.status, newValue: lead.status });
     if (changedFields.includes("assignedMemberId")) await log(tx, args, lead, "ASSIGNED", "Érdeklődő felelőse megváltozott", {
       oldAssigneeMemberId: existing.assignedMemberId, newAssigneeMemberId: lead.assignedMemberId,
@@ -85,4 +87,41 @@ export async function deleteLead(args, client = prisma) {
   });
 }
 
-export default { getLeads, getLeadById, createLead, updateLead, deleteLead };
+export class LeadConversionError extends Error {
+  constructor(message, statusCode, code) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
+
+export async function convertLead(args, client = prisma) {
+  return client.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT true AS locked FROM pg_advisory_xact_lock(${args.organizationId}::integer, ${args.leadId}::integer)`;
+    const existing = await tx.lead.findFirst({
+      where: { id: args.leadId, organizationId: args.organizationId },
+      select: { id: true, name: true, convertedAt: true },
+    });
+    if (!existing) throw new LeadConversionError("Érdeklődő nem található.", 404, "LEAD_NOT_FOUND");
+    if (existing.convertedAt) throw new LeadConversionError("Az érdeklődő már partnerré lett alakítva.", 409, "LEAD_ALREADY_CONVERTED");
+    if (!(await validMember(args.organizationId, args.actorMemberId, tx))) {
+      throw new LeadConversionError("Szervezeti tag nem található.", 404, "MEMBER_NOT_FOUND");
+    }
+
+    const partner = await createPartnerInTransaction({
+      organizationId: args.organizationId,
+      actorMemberId: args.actorMemberId,
+      data: args.partner,
+    }, tx);
+    const convertedAt = new Date();
+    const lead = await tx.lead.update({
+      where: { id: args.leadId, organizationId: args.organizationId },
+      data: { convertedAt, convertedPartnerId: partner.id, convertedByMemberId: args.actorMemberId },
+      select: buildLeadSelect({ includeConvertedPartner: args.includeConvertedPartner }),
+    });
+    await log(tx, args, lead, "LEAD_CONVERTED", "Érdeklődő partnerré alakítva", { partnerId: partner.id });
+    return { lead, ...(args.includeConvertedPartner && { partner: { id: partner.id, name: partner.name } }) };
+  });
+}
+
+export default { getLeads, getLeadById, createLead, updateLead, deleteLead, convertLead };

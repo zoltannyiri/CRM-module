@@ -10,6 +10,7 @@ const VALID_ACTIONS = new Set([
   "PRIORITY_CHANGED",
   "PIPELINE_STAGE_CHANGED",
   "FOLLOW_UP_COMPLETED",
+  "LEAD_CONVERTED",
 ]);
 
 function parsePositiveId(value) {
