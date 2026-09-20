@@ -13,6 +13,7 @@ const groups = [
   { title: "Feladatok", module: "TASKS", permissions: [["TASKS_VIEW", "Megtekintés"], ["TASKS_CREATE", "Létrehozás"], ["TASKS_EDIT", "Módosítás"], ["TASKS_DELETE", "Törlés"], ["TASKS_ASSIGN", "Felelős hozzárendelése"]] },
   { title: "Ajánlatok", module: "OFFERS", permissions: [["OFFERS_VIEW", "Megtekintés"], ["OFFERS_CREATE", "Létrehozás"], ["OFFERS_EDIT", "Módosítás"], ["OFFERS_DELETE", "Törlés"]] },
   { title: "Tevékenységek", permissions: [["ACTIVITY_VIEW", "Megtekintés"]] },
+  { title: "Egyéni mezők", permissions: [["CUSTOM_FIELDS_VIEW", "Megtekintés"], ["CUSTOM_FIELDS_CREATE", "Létrehozás"], ["CUSTOM_FIELDS_EDIT", "Szerkesztés"], ["CUSTOM_FIELDS_DELETE", "Törlés"]] },
 ];
 
 function canManageMember(member, role, actorMemberId) {

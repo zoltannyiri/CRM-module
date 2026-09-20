@@ -1,0 +1,168 @@
+import customFieldService from '../services/customFieldService.js';
+import { normalizeCustomFieldDefinition, normalizeCustomFieldValues } from '../validation/customFieldValidation.js';
+
+function positiveId(value) {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id <= 2147483647 ? id : null;
+}
+
+const listFields = async (req, res, next) => {
+  try {
+    const { entityType } = req.query;
+    if (entityType && entityType !== 'LEAD' && entityType !== 'PARTNER') {
+      return res.status(400).json({ message: 'Érvénytelen entitás típus.' });
+    }
+    
+    const fields = await customFieldService.getCustomFields({
+      organizationId: req.organization.id,
+      entityType
+    });
+    
+    res.json(fields);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createField = async (req, res, next) => {
+  try {
+    const { entityType, ...rest } = req.body;
+    if (entityType !== 'LEAD' && entityType !== 'PARTNER') {
+      return res.status(400).json({ message: 'Érvénytelen entitás típus.' });
+    }
+
+    const { data, error } = normalizeCustomFieldDefinition(rest);
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+
+    const field = await customFieldService.createCustomField({
+      organizationId: req.organization.id,
+      data: { entityType, ...data }
+    });
+
+    res.status(201).json(field);
+  } catch (error) {
+    if (error.statusCode === 409) {
+      return res.status(409).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+
+const updateField = async (req, res, next) => {
+  try {
+    const id = positiveId(req.params.id);
+    if (!id) return res.status(400).json({ message: 'Érvénytelen azonosító.' });
+
+    const { data, error } = normalizeCustomFieldDefinition(req.body, { partial: true });
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+
+    const updated = await customFieldService.updateCustomField({
+      organizationId: req.organization.id,
+      id,
+      data
+    });
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Mező nem található.' });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteField = async (req, res, next) => {
+  try {
+    const id = positiveId(req.params.id);
+    if (!id) return res.status(400).json({ message: 'Érvénytelen azonosító.' });
+
+    const updated = await customFieldService.deactivateCustomField({
+      organizationId: req.organization.id,
+      id
+    });
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Mező nem található.' });
+    }
+
+    res.json({ message: 'Mező deaktiválva.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getEntityValues = async (req, res, next) => {
+  try {
+    const { entityType, entityId } = req.query;
+    if (entityType !== 'LEAD' && entityType !== 'PARTNER') {
+      return res.status(400).json({ message: 'Érvénytelen entitás típus.' });
+    }
+    const parsedEntityId = positiveId(entityId);
+    if (!parsedEntityId) {
+      return res.status(400).json({ message: 'Érvénytelen entitás azonosító.' });
+    }
+
+    const data = await customFieldService.getCustomFieldValues({
+      organizationId: req.organization.id,
+      entityType,
+      entityId: parsedEntityId
+    });
+
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const setEntityValues = async (req, res, next) => {
+  try {
+    const { entityType, entityId, values } = req.body;
+    
+    if (entityType !== 'LEAD' && entityType !== 'PARTNER') {
+      return res.status(400).json({ message: 'Érvénytelen entitás típus.' });
+    }
+    const parsedEntityId = positiveId(String(entityId));
+    if (!parsedEntityId) {
+      return res.status(400).json({ message: 'Érvénytelen entitás azonosító.' });
+    }
+    if (!Array.isArray(values)) {
+      return res.status(400).json({ message: 'A values tömb formátumú kell legyen.' });
+    }
+
+    const activeFields = await customFieldService.getActiveCustomFields({
+      organizationId: req.organization.id,
+      entityType
+    });
+
+    const { data: normalizedValues, error } = normalizeCustomFieldValues(values, activeFields);
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+
+    await customFieldService.setCustomFieldValues({
+      organizationId: req.organization.id,
+      entityType,
+      entityId: parsedEntityId,
+      values: normalizedValues
+    });
+
+    res.json({ message: 'Értékek mentve.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export default {
+  listFields,
+  createField,
+  updateField,
+  deleteField,
+  getEntityValues,
+  setEntityValues
+};

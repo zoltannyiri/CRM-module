@@ -3,6 +3,7 @@ import apiClient from "../../api/apiClient.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useToast } from "../../hooks/useToast.js";
 import { leadStatusLabels, leadSourceLabels, memberName } from "./leadDisplay.js";
+import CustomFieldValuesSection from "../customField/CustomFieldValuesSection.jsx";
 
 const fieldClass = "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3.5 text-sm text-[#263338] outline-none transition placeholder:text-[#a1abaa] focus:border-[#79a97e] focus:ring-2 focus:ring-[#79a97e]/15";
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
@@ -24,6 +25,7 @@ function LeadForm({ mode = "create", lead, onClose, onSaved }) {
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(true);
   const [membersError, setMembersError] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const change = (event) => setData((current) => ({ ...current, [event.target.name]: event.target.value }));
@@ -62,6 +64,19 @@ function LeadForm({ mode = "create", lead, onClose, onSaved }) {
     setSubmitting(true);
     try {
       const response = isEditing ? await apiClient.patch(`/leads/${lead.id}`, payload) : await apiClient.post("/leads", payload);
+      
+      if (customFieldValues.length > 0) {
+        try {
+          await apiClient.put("/custom-fields/values", {
+            entityType: "LEAD",
+            entityId: response.data.id,
+            values: customFieldValues,
+          });
+        } catch {
+          // ignore
+        }
+      }
+
       showSuccess(isEditing ? "Az érdeklődő sikeresen módosítva." : "Az érdeklődő sikeresen létrehozva.");
       onSaved?.(response.data);
       onClose();
@@ -86,6 +101,11 @@ function LeadForm({ mode = "create", lead, onClose, onSaved }) {
           <label className={labelClass}>Felelős<select name="assignedMemberId" value={data.assignedMemberId} onChange={change} disabled={membersLoading || Boolean(membersError)} className={`${fieldClass} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}><option value="">Nincs felelős</option>{members.map((member) => <option key={member.id} value={member.id}>{memberName(member)}</option>)}</select></label>
         </div>{membersError && <p role="alert" className="mt-4 text-xs text-[#9a4335]">{membersError}</p>}</section>
         <section className="rounded-lg border border-[#dfe5e3] bg-white p-6"><h3 className="mb-5 text-sm font-semibold text-[#2b393e]">Megjegyzés</h3><label className={labelClass}>Belső megjegyzés<textarea name="note" value={data.note} onChange={change} maxLength={10000} rows={5} className={`${fieldClass} h-auto resize-y py-3`} /></label></section>
+        <CustomFieldValuesSection
+          entityType="LEAD"
+          entityId={isEditing ? lead?.id : null}
+          onChange={setCustomFieldValues}
+        />
         {error && <p role="alert" className="rounded-md border border-[#efd7d1] bg-[#fdf1ee] px-4 py-3 text-sm text-[#9a4335]">{error}</p>}
       </div></form>
       <footer className="flex justify-end gap-3 border-t border-[#dfe5e3] bg-white px-7 py-4"><button type="button" onClick={onClose} className="h-10 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-5 text-xs font-medium text-[#455358] hover:bg-[#f5f7f6]">Mégse</button><button type="submit" form="lead-form" disabled={submitting || membersLoading || Boolean(membersError)} className="h-10 cursor-pointer rounded-md border border-[#1e3338] bg-[#263b40] px-6 text-xs font-semibold text-white hover:bg-[#1c3035] disabled:cursor-wait disabled:opacity-60">{submitting ? "Mentés…" : isEditing ? "Módosítások mentése" : "Érdeklődő létrehozása"}</button></footer>

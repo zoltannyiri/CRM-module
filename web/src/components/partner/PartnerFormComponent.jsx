@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import apiClient from "../../api/apiClient.js";
 import { useToast } from "../../hooks/useToast.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import CustomFieldValuesSection from "../customField/CustomFieldValuesSection.jsx";
 
 const emptyForm = {
   type: "COMPANY",
@@ -41,6 +42,7 @@ function PartnerForm({ mode = "create", partner, onClose, onSaved }) {
   const [formData, setFormData] = useState(() => partner
     ? Object.fromEntries(Object.keys(emptyForm).map((key) => [key, partner[key] ?? emptyForm[key]]))
     : emptyForm);
+  const [customFieldValues, setCustomFieldValues] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isEditing = mode === "edit";
@@ -81,6 +83,19 @@ function PartnerForm({ mode = "create", partner, onClose, onSaved }) {
       const response = isEditing
         ? await apiClient.patch(`/partners/${partner.id}`, payload)
         : await apiClient.post("/partners", payload);
+
+      if (customFieldValues.length > 0) {
+        try {
+          await apiClient.put("/custom-fields/values", {
+            entityType: "PARTNER",
+            entityId: response.data.id,
+            values: customFieldValues,
+          });
+        } catch {
+          // ignore
+        }
+      }
+
       onSaved?.(response.data);
       showSuccess(isEditing ? "A partner adatai sikeresen módosultak." : "A partner sikeresen létrejött.");
       onClose();
@@ -150,6 +165,12 @@ function PartnerForm({ mode = "create", partner, onClose, onSaved }) {
                 />
               </label>
             </section>
+
+            <CustomFieldValuesSection
+              entityType="PARTNER"
+              entityId={isEditing ? partner?.id : null}
+              onChange={setCustomFieldValues}
+            />
 
             {error && <p role="alert" className="rounded-md border border-[#efd7d1] bg-[#fdf1ee] px-4 py-3 text-sm text-[#9a4335]">{error}</p>}
           </fieldset>

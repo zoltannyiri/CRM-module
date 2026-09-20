@@ -4,6 +4,7 @@ import apiClient from "../../api/apiClient.js";
 
 export default function PartnerShowComponent({ partnerId }) {
   const [partner, setPartner] = useState(null);
+  const [customFieldData, setCustomFieldData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -32,6 +33,10 @@ export default function PartnerShowComponent({ partnerId }) {
           setLoading(false);
         }
       });
+      
+    apiClient.get(`/custom-fields/values?entityType=PARTNER&entityId=${partnerId}`)
+      .then(({ data }) => { if (active) setCustomFieldData(data); })
+      .catch(() => {});
 
     return () => {
       active = false;
@@ -194,6 +199,31 @@ export default function PartnerShowComponent({ partnerId }) {
             </div>
           </dl>
         </section>
+
+        {customFieldData?.fields?.length > 0 && (
+          <section className="rounded-xl border border-[#dbe1df] bg-white p-6 shadow-[0_1px_2px_rgba(24,39,43,0.02)] lg:col-span-2">
+            <h3 className="mb-4 flex items-center gap-2 border-b border-[#f0f3f2] pb-3 text-xs font-bold tracking-wider text-[#8a9695] uppercase">
+              <i className="pi pi-bars text-sm text-[#78ad7d]" aria-hidden="true" />
+              Egyéni mezők
+            </h3>
+            <dl className="grid gap-3.5 text-xs">
+              {customFieldData.fields.map(field => {
+                const rawValue = customFieldData.values?.[field.id];
+                let displayValue = rawValue || '—';
+                if (field.fieldType === 'BOOLEAN') displayValue = rawValue === 'true' ? 'Igen' : rawValue === 'false' ? 'Nem' : '—';
+                if (field.fieldType === 'MULTI_SELECT' && rawValue) {
+                  try { displayValue = JSON.parse(rawValue).join(', '); } catch { displayValue = rawValue; }
+                }
+                return (
+                  <div key={field.id} className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+                    <dt className="text-[#71807c]">{field.label}</dt>
+                    <dd className="font-medium break-words text-[#253238] sm:col-span-2">{displayValue}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </section>
+        )}
 
         {/* 3. Megjegyzés */}
         <section className="rounded-xl border border-[#dbe1df] bg-white p-6 shadow-[0_1px_2px_rgba(24,39,43,0.02)] lg:col-span-2">

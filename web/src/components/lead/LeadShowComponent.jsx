@@ -21,6 +21,7 @@ function LeadShow({ leadId, onEdit, onConvert }) {
   const { hasModule, hasPermission } = useAuth();
   const { showSuccess, showError } = useToast();
   const [lead, setLead] = useState(null);
+  const [customFieldData, setCustomFieldData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -30,6 +31,11 @@ function LeadShow({ leadId, onEdit, onConvert }) {
     apiClient.get(`/leads/${leadId}`).then(({ data }) => { if (active) setLead(data); })
       .catch((requestError) => { if (active) setError(requestError.response?.status === 404 ? "Az érdeklődő nem található." : "Az érdeklődő adatai nem tölthetők be."); })
       .finally(() => { if (active) setLoading(false); });
+      
+    apiClient.get(`/custom-fields/values?entityType=LEAD&entityId=${leadId}`)
+      .then(({ data }) => { if (active) setCustomFieldData(data); })
+      .catch(() => {});
+      
     return () => { active = false; };
   }, [leadId]);
 
@@ -57,6 +63,27 @@ function LeadShow({ leadId, onEdit, onConvert }) {
       <section className="rounded-xl border border-[#dbe1df] bg-white p-6"><h3 className="mb-4 border-b border-[#f0f3f2] pb-3 text-xs font-bold uppercase tracking-wider text-[#8a9695]">Alapadatok</h3><dl className="grid gap-3.5 text-xs"><Row label="Név">{lead.name}</Row><Row label="Cégnév">{lead.companyName}</Row><Row label="E-mail">{lead.email}</Row><Row label="Telefon">{lead.phone}</Row><Row label="Státusz">{leadStatusLabels[lead.status]}</Row><Row label="Forrás">{leadSourceLabels[lead.source]}</Row><Row label="Felelős">{memberName(lead.assignedMember)}</Row></dl></section>
       <section className="rounded-xl border border-[#dbe1df] bg-white p-6"><h3 className="mb-4 border-b border-[#f0f3f2] pb-3 text-xs font-bold uppercase tracking-wider text-[#8a9695]">Metaadatok</h3><dl className="grid gap-3.5 text-xs"><Row label="Létrehozta">{memberName(lead.createdByMember)}</Row><Row label="Létrehozva">{formatLeadDate(lead.createdAt)}</Row><Row label="Módosítva">{formatLeadDate(lead.updatedAt)}</Row>{lead.convertedAt && <Row label="Partnerré alakítva"><span>{formatLeadDateTime(lead.convertedAt)}</span>{lead.convertedPartner && <Link to={`/partner/${lead.convertedPartner.id}`} className="ml-3 cursor-pointer font-semibold text-[#4f8155] hover:underline">Partner megtekintése</Link>}</Row>}</dl></section>
     </div>
+    {customFieldData?.fields?.length > 0 && (
+      <section className="rounded-xl border border-[#dbe1df] bg-white p-6">
+        <h3 className="mb-4 border-b border-[#f0f3f2] pb-3 text-xs font-bold uppercase tracking-wider text-[#8a9695]">Egyéni mezők</h3>
+        <dl className="grid gap-3.5 text-xs">
+          {customFieldData.fields.map(field => {
+            const rawValue = customFieldData.values?.[field.id];
+            let displayValue = rawValue || '—';
+            if (field.fieldType === 'BOOLEAN') displayValue = rawValue === 'true' ? 'Igen' : rawValue === 'false' ? 'Nem' : '—';
+            if (field.fieldType === 'MULTI_SELECT' && rawValue) {
+              try { displayValue = JSON.parse(rawValue).join(', '); } catch { displayValue = rawValue; }
+            }
+            return (
+              <div key={field.id} className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+                <dt className="text-[#71807c]">{field.label}</dt>
+                <dd className="font-medium break-words text-[#253238] sm:col-span-2">{displayValue}</dd>
+              </div>
+            );
+          })}
+        </dl>
+      </section>
+    )}
     <section className="rounded-xl border border-[#dbe1df] bg-white p-6"><h3 className="mb-4 text-sm font-semibold">Megjegyzés</h3><p className="text-sm whitespace-pre-wrap break-words text-[#536166]">{lead.note || "—"}</p></section>
   </div>;
 }

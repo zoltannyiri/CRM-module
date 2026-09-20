@@ -13,6 +13,7 @@ import ActivityPage from "./pages/ActivityPage.jsx";
 import ModuleRoute from "./components/ModuleRoute.jsx";
 import PermissionRoute from "./components/PermissionRoute.jsx";
 import SettingsPermissionsPage from "./pages/SettingsPermissionsPage.jsx";
+import SettingsCustomFieldsPage from "./pages/SettingsCustomFieldsPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import LeadPage from "./pages/LeadPage.jsx";
 import OfferPage from "./pages/OfferPage.jsx";
@@ -104,6 +105,7 @@ function App() {
           }
         />
         <Route path="/settings/permissions" element={<Workspace><SettingsPermissionsPage /></Workspace>} />
+        <Route path="/settings/custom-fields" element={<Workspace><SettingsCustomFieldsPage /></Workspace>} />
         <Route path="/dashboard" element={<Workspace><DashboardPage /></Workspace>} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>

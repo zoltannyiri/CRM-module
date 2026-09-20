@@ -127,6 +127,11 @@ enum PermissionKey {
   FOLLOW_UPS_COMPLETE
 
   ACTIVITY_VIEW
+
+  CUSTOM_FIELDS_VIEW
+  CUSTOM_FIELDS_CREATE
+  CUSTOM_FIELDS_EDIT
+  CUSTOM_FIELDS_DELETE
 }
 
 enum DocumentEntityType {
@@ -141,6 +146,24 @@ enum OfferStatus {
   REJECTED
   EXPIRED
   CANCELLED
+}
+
+
+enum CustomFieldEntityType {
+  LEAD
+  PARTNER
+}
+
+enum CustomFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  MONEY
+  BOOLEAN
+  DATE
+  DATETIME
+  SELECT
+  MULTI_SELECT
 }
 
 model Organization {
@@ -161,7 +184,9 @@ model Organization {
   leads       Lead[]
   pipelines   Pipeline[]
   pipelinePositions LeadPipelinePosition[]
-  followUps FollowUp[]
+  followUps         FollowUp[]
+  customFields      CustomField[]
+  customFieldValues CustomFieldValue[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -615,4 +640,44 @@ model FollowUp {
   @@index([leadId, organizationId, status, dueAt])
   @@index([assignedMemberId, organizationId])
   @@index([createdByMemberId, organizationId])
+}
+
+model CustomField {
+  id             Int                   @id @default(autoincrement())
+  organizationId Int
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entityType     CustomFieldEntityType
+  key            String
+  label          String
+  fieldType      CustomFieldType
+  required       Boolean               @default(false)
+  active         Boolean               @default(true)
+  sortOrder      Int                   @default(0)
+  placeholder    String?
+  helpText       String?
+  defaultValue   String?
+  options        Json?
+  values         CustomFieldValue[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([organizationId, entityType, key])
+  @@index([organizationId, entityType, active])
+}
+
+model CustomFieldValue {
+  id             Int                   @id @default(autoincrement())
+  organizationId Int
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customFieldId  Int
+  customField    CustomField           @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  entityType     CustomFieldEntityType
+  entityId       Int
+  value          String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([customFieldId, entityId])
+  @@index([organizationId, entityType, entityId])
+  @@index([customFieldId])
 }

@@ -37,13 +37,14 @@ const navigation = [
   { id: "products", label: "Termékek", children: ["Összes termék", "Kategóriák"] },
   { id: "messages", label: "Üzenetek" },
   { id: "activities", label: "Tevékenységek", children: ["Tevékenységek", "Feladatok", "Naptár"] },
-  { id: "settings", label: "Beállítások", adminOnly: true, route: "/settings/permissions" },
+  { id: "settings", label: "Beállítások", adminOnly: true, children: ["Jogosultságok", "Egyéni mezők"] },
   { id: "help", label: "Súgó és támogatás" },
 ];
 
 const childRoutes = {
   contacts: ["/partner", "/contact"],
   activities: ["/activity", "/task"],
+  settings: ["/settings/permissions", "/settings/custom-fields"],
 };
 
 const activeItemForPath = (pathname) => {
@@ -58,7 +59,8 @@ const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/offer")) return "offers";
   if (pathname.startsWith("/activity")) return "activities-0";
   if (pathname.startsWith("/task")) return "activities-1";
-  if (pathname.startsWith("/settings")) return "settings";
+  if (pathname.startsWith("/settings/custom-fields")) return "settings-1";
+  if (pathname.startsWith("/settings")) return "settings-0";
   return "dashboard";
 };
 
@@ -71,6 +73,7 @@ export default function Sidebar() {
   const [expandedGroup, setExpandedGroup] = useState(() => {
     if (location.pathname.startsWith("/partner") || location.pathname.startsWith("/contact")) return "contacts";
     if (location.pathname.startsWith("/activity") || location.pathname.startsWith("/task")) return "activities";
+    if (location.pathname.startsWith("/settings")) return "settings";
     return null;
   });
 
