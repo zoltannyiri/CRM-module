@@ -202,19 +202,65 @@ test("Leads real database CRUD, authorization and migration", {
         assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
         await setPermissions(["PARTNERS_CREATE"]);
         assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
+        await setPermissions(["LEADS_VIEW"]);
+        assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
+        await setPermissions(["LEADS_VIEW", "LEADS_CONVERT"]);
+        assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
+        await setPermissions(["LEADS_VIEW", "PARTNERS_CREATE"]);
+        assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
+
+        // Direct API attack regression: LEADS_CONVERT and PARTNERS_CREATE present, LEADS_VIEW missing
         await setPermissions(["LEADS_CONVERT", "PARTNERS_CREATE"]);
+        const partnerCountBeforeBypass = await prisma.partner.count({ where: { organizationId: org.id } });
+        const leadActivitiesBeforeBypass = await prisma.activity.count({ where: { entityType: "LEAD", entityId: candidate.id } });
+        const bypassAttempt = await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion });
+        assert.equal(bypassAttempt.status, 403);
+        assert.equal(bypassAttempt.body.code, "PERMISSION_DENIED");
+        assert.equal(bypassAttempt.body.permission, "LEADS_VIEW");
+        assert.equal(await prisma.partner.count({ where: { organizationId: org.id } }), partnerCountBeforeBypass);
+        const candidateAfterBypass = await prisma.lead.findUnique({ where: { id: candidate.id } });
+        assert.equal(candidateAfterBypass.convertedAt, null);
+        assert.equal(candidateAfterBypass.convertedPartnerId, null);
+        assert.equal(await prisma.activity.count({ where: { entityType: "LEAD", entityId: candidate.id } }), leadActivitiesBeforeBypass);
+
+        // PARTNERS module disabled check
+        await setPermissions(["LEADS_VIEW", "LEADS_CONVERT", "PARTNERS_CREATE"]);
         await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } }, data: { enabled: false } });
         assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 403);
         await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module: "PARTNERS" } }, data: { enabled: true } });
+
+        // Tenant isolation: foreign lead returns 404 (non-leaking response)
         assert.equal((await request(`/api/leads/${foreign.id}/convert`, { token: userToken, method: "POST", body: conversion })).status, 404);
+
+        // Partner validation
         for (const body of [null, {}, { partner: null }, { partner: { name: "" } }, { partner: { name: "X", organizationId: other.id } }, { partner: { name: "X", createdByMemberId: owner.membership.id } }, { partner: { name: "X", type: "INVALID" } }]) {
           assert.equal((await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body })).status, 400);
         }
+
+        // Success case without PARTNERS_VIEW (PARTNERS_VIEW not required, details not leaked)
+        const partnerCountBefore = await prisma.partner.count({ where: { organizationId: org.id } });
         const converted = await request(`/api/leads/${candidate.id}/convert`, { token: userToken, method: "POST", body: conversion });
         assert.equal(converted.status, 201);
         assert.equal(Object.hasOwn(converted.body, "partner"), false);
         assert.equal(Object.hasOwn(converted.body.lead, "convertedPartner"), false);
         assert.ok(converted.body.lead.convertedAt);
+        assert.equal(await prisma.partner.count({ where: { organizationId: org.id } }), partnerCountBefore + 1);
+
+        const storedCandidate = await prisma.lead.findUnique({ where: { id: candidate.id } });
+        assert.ok(storedCandidate.convertedAt);
+        assert.ok(storedCandidate.convertedPartnerId);
+        assert.equal(storedCandidate.convertedByMemberId, user.membership.id);
+        assert.equal(await prisma.activity.count({ where: { entityType: "LEAD", entityId: candidate.id, action: "LEAD_CONVERTED" } }), 1);
+        assert.equal(await prisma.activity.count({ where: { entityType: "PARTNER", entityId: storedCandidate.convertedPartnerId, action: "CREATED" } }), 1);
+
+        // Success case with PARTNERS_VIEW (returns partner: { id, name })
+        const candidateWithPv = await prisma.lead.create({ data: { organizationId: org.id, name: "Candidate with PV", companyName: "PV Kft." } });
+        await setPermissions(["LEADS_VIEW", "LEADS_CONVERT", "PARTNERS_CREATE", "PARTNERS_VIEW"]);
+        const convertedWithPv = await request(`/api/leads/${candidateWithPv.id}/convert`, { token: userToken, method: "POST", body: { partner: { type: "COMPANY", name: "PV Kft." } } });
+        assert.equal(convertedWithPv.status, 201);
+        assert.ok(convertedWithPv.body.partner);
+        assert.equal(convertedWithPv.body.partner.name, "PV Kft.");
+        assert.ok(convertedWithPv.body.partner.id);
       });
       await t.test("conversion is atomic, concurrent-safe and has exactly two domain activities", async () => {
         const candidate = await prisma.lead.create({ data: { organizationId: org.id, name: "Parallel", companyName: "Parallel Kft." } });
