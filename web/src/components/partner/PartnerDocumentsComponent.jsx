@@ -235,7 +235,7 @@ export default function PartnerDocumentsComponent({ partnerId }) {
                 <span>
                   <span className="mr-2 text-[#8a9693] md:hidden">Kategória:</span>
                   <span className="inline-flex rounded border border-[#dbe1df] bg-[#f5f7f6] px-2 py-0.5 text-[11px] font-medium text-[#536166]">
-                    {doc.category || "Általános"}
+                    {doc.documentType || "GENERAL"}
                   </span>
                 </span>
 

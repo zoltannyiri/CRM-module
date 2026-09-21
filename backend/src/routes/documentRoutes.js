@@ -8,6 +8,9 @@ import requirePermission from "../middleware/requirePermission.js";
 
 const router = express.Router();
 
+router.post("/:id/links", authMiddleware, requireOrganization, requireModule("DOCUMENTS"), requirePermission("DOCUMENTS_EDIT"), documentController.addLink);
+router.delete("/:id/links/:linkId", authMiddleware, requireOrganization, requireModule("DOCUMENTS"), requirePermission("DOCUMENTS_EDIT"), documentController.removeLink);
+
 router.get(
   "/",
   authMiddleware,

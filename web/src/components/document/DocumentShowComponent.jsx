@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import apiClient from "../../api/apiClient.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useToast } from "../../hooks/useToast.js";
+import { getDocumentTypeLabel } from "./documentDisplay.js";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -149,9 +150,9 @@ export default function DocumentShowComponent({ documentId, onEdit }) {
           <p className="mb-1 text-[10px] font-semibold tracking-[.12em] text-[#8a9693] uppercase">Dokumentum</p>
           <div className="flex flex-wrap items-center gap-2.5">
             <h2 className="text-lg font-bold tracking-tight text-[#253238]">{documentData.name}</h2>
-            {documentData.category && (
+            {documentData.documentType && (
               <span className="inline-flex rounded-md border border-[#dbe1df] bg-[#f5f7f6] px-2.5 py-0.5 text-xs font-medium text-[#536166]">
-                {documentData.category}
+                {getDocumentTypeLabel(documentData.documentType)}
               </span>
             )}
           </div>
@@ -216,8 +217,8 @@ export default function DocumentShowComponent({ documentId, onEdit }) {
               <dd className="mt-1 font-medium text-[#253238]">{formatFileSize(documentData.size)}</dd>
             </div>
             <div>
-              <dt className="text-[#71807c]">Kategória</dt>
-              <dd className="mt-1 font-medium text-[#253238]">{documentData.category || "—"}</dd>
+              <dt className="text-[#71807c]">Dokumentumtípus</dt>
+              <dd className="mt-1 font-medium text-[#253238]">{getDocumentTypeLabel(documentData.documentType)}</dd>
             </div>
             <div>
               <dt className="text-[#71807c]">Feltöltő</dt>
@@ -276,13 +277,13 @@ export default function DocumentShowComponent({ documentId, onEdit }) {
         </section>
 
         {/* Megjegyzés */}
-        {documentData.note && (
+        {documentData.description && (
           <section className="rounded-xl border border-[#dbe1df] bg-white p-6 shadow-[0_1px_2px_rgba(24,39,43,0.02)] lg:col-span-2">
             <h3 className="mb-3 text-xs font-bold tracking-wider text-[#8a9695] uppercase">
               Megjegyzés
             </h3>
             <p className="text-xs text-[#344247] whitespace-pre-wrap leading-relaxed">
-              {documentData.note}
+              {documentData.description}
             </p>
           </section>
         )}

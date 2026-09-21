@@ -9,6 +9,7 @@ import PartnerShowComponent from "../components/partner/PartnerShowComponent.jsx
 import PartnerContactsComponent from "../components/partner/PartnerContactsComponent.jsx";
 import PartnerDocumentsComponent from "../components/partner/PartnerDocumentsComponent.jsx";
 import RelatedOffersComponent from "../components/offer/RelatedOffersComponent.jsx";
+import RelatedIncomingInvoicesComponent from "../components/incomingInvoice/RelatedIncomingInvoicesComponent.jsx";
 import PartnerActivityComponent from "../components/partner/PartnerActivityComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
@@ -152,6 +153,9 @@ export default function PartnerPage() {
               <TabPanel header="Ajánlatok">
                 <RelatedOffersComponent partnerId={id} />
               </TabPanel>
+            )}
+            {hasModule("INCOMING_INVOICES") && hasPermission("INCOMING_INVOICES_VIEW") && (
+              <TabPanel header="Számlák"><RelatedIncomingInvoicesComponent partnerId={id} /></TabPanel>
             )}
             {hasPermission("ACTIVITY_VIEW") && <TabPanel header="Tevékenységek">
               <PartnerActivityComponent key={id} partnerId={id} />

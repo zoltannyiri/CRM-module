@@ -18,6 +18,7 @@ import followUpRoutes from "./routes/followUpRoutes.js";
 import offerRoutes from "./routes/offerRoutes.js";
 import customFieldRoutes from "./routes/customFieldRoutes.js";
 import viewPreferenceRoutes from "./routes/viewPreferenceRoutes.js";
+import incomingInvoiceRoutes from "./routes/incomingInvoiceRoutes.js";
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use("/api/pipelines", pipelineRoutes);
 app.use("/api/follow-ups", followUpRoutes);
 app.use("/api/custom-fields", customFieldRoutes);
 app.use("/api/view-preferences", viewPreferenceRoutes);
+app.use("/api/incoming-invoices", incomingInvoiceRoutes);
 
 app.use((error, _req, res, _next) => {
   const candidateStatus = error?.statusCode ?? error?.status;

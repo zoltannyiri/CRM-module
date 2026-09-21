@@ -4,6 +4,7 @@ import { DataTable } from "primereact/datatable";
 
 import apiClient from "../../api/apiClient.js";
 import { useToast } from "../../hooks/useToast.js";
+import { getDocumentTypeLabel } from "./documentDisplay.js";
 
 const cellClass = "h-[58px] border-r border-b border-[#e1e6e4] px-4 text-xs text-[#344247] last:border-r-0";
 const headerClass = "h-12 border-r border-b border-[#dbe1df] px-4 text-left text-[11px] font-medium text-[#445156] last:border-r-0";
@@ -40,7 +41,7 @@ function formatMimeType(mimeType, originalFileName = "") {
 
 export default function DocumentListComponent({
   query = "",
-  categoryFilter = "ALL",
+  documentTypeFilter = "ALL",
   sortDirection = "desc",
   reloadKey = 0,
   onView,
@@ -58,14 +59,14 @@ export default function DocumentListComponent({
   const [deletingId, setDeletingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const rowsPerPage = 10;
-  const requestKey = JSON.stringify([query, categoryFilter, sortDirection, reloadKey]);
+  const requestKey = JSON.stringify([query, documentTypeFilter, sortDirection, reloadKey]);
   const loading = result.resolvedKey !== requestKey;
 
   useEffect(() => {
     let active = true;
     const params = {
       ...(query.trim() ? { q: query.trim() } : {}),
-      ...(categoryFilter !== "ALL" ? { category: categoryFilter } : {}),
+      ...(documentTypeFilter !== "ALL" ? { documentType: documentTypeFilter } : {}),
       sortDirection,
     };
     apiClient.get("/documents", { params })
@@ -76,7 +77,7 @@ export default function DocumentListComponent({
         if (active) setResult({ documents: [], resolvedKey: requestKey, error: error.message || "A dokumentumok betöltése sikertelen." });
       });
     return () => { active = false; };
-  }, [categoryFilter, query, reloadKey, requestKey, sortDirection]);
+  }, [documentTypeFilter, query, reloadKey, requestKey, sortDirection]);
 
   const documents = result.documents;
   const pageCount = Math.max(1, Math.ceil(documents.length / rowsPerPage));
@@ -178,11 +179,11 @@ export default function DocumentListComponent({
           <Column
             headerClassName={headerClass}
             bodyClassName={cellClass}
-            header="Kategória"
+            header="Típus"
             body={(doc) => (
-              doc.category ? (
+              doc.documentType ? (
                 <span className="inline-flex rounded-md border border-[#dbe1df] bg-[#f5f7f6] px-2 py-0.5 text-[11px] font-medium text-[#536166]">
-                  {doc.category}
+                  {getDocumentTypeLabel(doc.documentType)}
                 </span>
               ) : <span className="text-[#84908e]">—</span>
             )}
@@ -195,6 +196,8 @@ export default function DocumentListComponent({
               const parts = [];
               if (doc.partner) parts.push(`Partner: ${doc.partner.name}`);
               if (doc.project) parts.push(`Projekt: ${doc.project.name}`);
+              if (doc.offer) parts.push(`Ajánlat: ${doc.offer.offerNumber}`);
+              if (doc.incomingInvoice) parts.push(`Számla: ${doc.incomingInvoice.invoiceNumber}`);
               return parts.length > 0 ? (
                 <span className="truncate max-w-[200px] block" title={parts.join(" · ")}>
                   {parts.join(" · ")}

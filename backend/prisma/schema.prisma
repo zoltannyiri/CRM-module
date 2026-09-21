@@ -49,6 +49,7 @@ enum ActivityEntityType {
   OFFER
   LEAD
   FOLLOW_UP
+  INCOMING_INVOICE
 }
 
 enum ActivityAction {
@@ -61,6 +62,8 @@ enum ActivityAction {
   PIPELINE_STAGE_CHANGED
   FOLLOW_UP_COMPLETED
   LEAD_CONVERTED
+  DOCUMENT_ATTACHED
+  DOCUMENT_REMOVED
 }
 
 enum ModuleKey {
@@ -74,6 +77,7 @@ enum ModuleKey {
   LEADS
   PIPELINE
   FOLLOW_UPS
+  INCOMING_INVOICES
 
   LOCATIONS
   DEVICES
@@ -103,6 +107,11 @@ enum PermissionKey {
   DOCUMENTS_EDIT
   DOCUMENTS_DELETE
   DOCUMENTS_DOWNLOAD
+
+  INCOMING_INVOICES_VIEW
+  INCOMING_INVOICES_CREATE
+  INCOMING_INVOICES_EDIT
+  INCOMING_INVOICES_DELETE
 
   OFFERS_VIEW
   OFFERS_CREATE
@@ -137,6 +146,16 @@ enum PermissionKey {
 enum DocumentEntityType {
   PARTNER
   PROJECT
+  OFFER
+  INCOMING_INVOICE
+}
+
+enum IncomingInvoiceStatus {
+  DRAFT
+  RECEIVED
+  APPROVED
+  PAID
+  REJECTED
 }
 
 enum OfferStatus {
@@ -188,6 +207,8 @@ model Organization {
   customFields      CustomField[]
   customFieldValues CustomFieldValue[]
   listPreferences EntityListPreference[]
+  documentLinks DocumentLink[]
+  incomingInvoices IncomingInvoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -226,6 +247,7 @@ model OrganizationMember {
   assignedFollowUps FollowUp[] @relation("FollowUpAssignee")
   createdFollowUps FollowUp[] @relation("FollowUpCreator")
   listPreferences EntityListPreference[]
+  createdIncomingInvoices IncomingInvoice[] @relation("IncomingInvoiceCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -320,6 +342,7 @@ model Partner {
   projects Project[]
   offers   Offer[]
   convertedLeads Lead[] @relation("LeadConvertedPartner")
+  incomingInvoices IncomingInvoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -364,6 +387,7 @@ model Project {
   deadline    DateTime?
   tasks       Task[]
   offers      Offer[]
+  incomingInvoices IncomingInvoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -371,6 +395,7 @@ model Project {
   @@index([organizationId])
   @@index([partnerId])
   @@index([organizationId, status])
+  @@unique([id, organizationId])
 }
 
 model Task {
@@ -425,8 +450,8 @@ model Document {
   mimeType       String
   size           Int
   storageKey     String
-  category       String?
-  note           String?
+  documentType   String               @default("GENERAL") @map("category")
+  description    String?              @map("note")
   uploadedByMemberId Int?
   uploadedByMember OrganizationMember? @relation(fields: [uploadedByMemberId], references: [id], onDelete: SetNull)
   links          DocumentLink[]
@@ -434,20 +459,58 @@ model Document {
   updatedAt      DateTime            @updatedAt
 
   @@index([organizationId])
+  @@index([organizationId, documentType])
   @@index([uploadedByMemberId])
   @@index([createdAt])
+  @@unique([id, organizationId])
 }
 
 model DocumentLink {
-  id         Int                @id @default(autoincrement())
+  id             Int                @id @default(autoincrement())
+  organizationId Int
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   documentId Int
-  document   Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   Document           @relation(fields: [documentId, organizationId], references: [id, organizationId], onDelete: Cascade)
   entityType DocumentEntityType
   entityId   Int
   createdAt  DateTime           @default(now())
 
   @@unique([documentId, entityType, entityId])
-  @@index([entityType, entityId])
+  @@index([organizationId, entityType, entityId])
+  @@index([documentId])
+}
+
+model IncomingInvoice {
+  id                  Int                   @id @default(autoincrement())
+  organizationId      Int
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplierPartnerId   Int
+  supplierPartner     Partner               @relation(fields: [supplierPartnerId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  projectId           Int?
+  project             Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  invoiceNumber       String
+  issueDate           DateTime              @db.Date
+  performanceDate     DateTime?             @db.Date
+  dueDate             DateTime?             @db.Date
+  currency            String                @default("HUF") @db.VarChar(3)
+  netAmount           Decimal               @db.Decimal(18, 2)
+  vatAmount           Decimal               @db.Decimal(18, 2)
+  grossAmount         Decimal               @db.Decimal(18, 2)
+  status              IncomingInvoiceStatus @default(DRAFT)
+  note                String?
+  createdByMemberId   Int?
+  createdByMember     OrganizationMember?   @relation("IncomingInvoiceCreator", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@unique([organizationId, supplierPartnerId, invoiceNumber])
+  @@unique([id, organizationId])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, supplierPartnerId])
+  @@index([organizationId, dueDate])
+  @@index([projectId, organizationId])
+  @@index([createdByMemberId, organizationId])
 }
 
 model Offer {

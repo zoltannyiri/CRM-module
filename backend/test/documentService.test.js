@@ -12,6 +12,8 @@ import {
   createDocument,
   updateDocument,
   deleteDocument,
+  addDocumentLink,
+  removeDocumentLink,
 } from "../src/services/documentService.js";
 
 test("storageService saves, retrieves and deletes files safely", async () => {
@@ -172,7 +174,7 @@ test("documentService update changes only the explicitly supplied link type", as
   }, fakeClient);
 
   assert.deepEqual(deletedLinks, [{ documentId: 1, entityType: "PARTNER", document: { organizationId: 42 } }]);
-  assert.deepEqual(createdLinks, [{ documentId: 1, entityType: "PARTNER", entityId: 55 }]);
+  assert.deepEqual(createdLinks, [{ documentId: 1, organizationId: 42, entityType: "PARTNER", entityId: 55 }]);
   assert.equal(updated.storageKey, undefined);
   assert.equal(updated.links, undefined);
 });
@@ -227,6 +229,45 @@ test("documentService getDocumentForDownload enforces tenant isolation", async (
   // Other tenant trying to access:
   const denied = await getDocumentForDownload({ organizationId: 99, documentId: 1 }, fakeClient);
   assert.equal(denied, null);
+});
+
+test("DocumentLink validates tenant targets, supports Partner/Project/Invoice and rejects duplicates", async () => {
+  const links = [];
+  const fakeClient = {
+    $transaction: async (callback) => callback(fakeClient),
+    organizationModule: { findMany: async () => ["DOCUMENTS", "PARTNERS", "PROJECTS", "INCOMING_INVOICES"].map((module) => ({ module })) },
+    organizationMemberPermission: { findMany: async () => ["PARTNERS_VIEW", "PROJECTS_VIEW", "INCOMING_INVOICES_VIEW"].map((permission) => ({ permission })) },
+    document: { findFirst: async ({ where }) => where.organizationId === 42 ? { id: 1, name: "Bizonylat" } : null },
+    partner: { findFirst: async ({ where }) => where.organizationId === 42 && where.id === 10 ? { id: 10 } : null },
+    project: { findFirst: async ({ where }) => where.organizationId === 42 && where.id === 20 ? { id: 20 } : null },
+    incomingInvoice: { findFirst: async ({ where }) => where.organizationId === 42 && where.id === 30 ? { id: 30 } : null },
+    documentLink: {
+      findFirst: async ({ where }) => links.find((link) => link.organizationId === where.organizationId && link.documentId === where.documentId && link.entityType === where.entityType && link.entityId === where.entityId) || null,
+      create: async ({ data }) => { const link = { id: links.length + 1, ...data }; links.push(link); return link; },
+    },
+    activity: { create: async ({ data }) => data },
+  };
+  const args = { organizationId: 42, membership: { id: 5, role: "USER" }, actorMemberId: 5, documentId: 1 };
+  await addDocumentLink({ ...args, entityType: "PARTNER", entityId: 10 }, fakeClient);
+  await addDocumentLink({ ...args, entityType: "PROJECT", entityId: 20 }, fakeClient);
+  await addDocumentLink({ ...args, entityType: "INCOMING_INVOICE", entityId: 30 }, fakeClient);
+  assert.deepEqual(links.map(({ entityType }) => entityType), ["PARTNER", "PROJECT", "INCOMING_INVOICE"]);
+  await assert.rejects(addDocumentLink({ ...args, entityType: "PARTNER", entityId: 10 }, fakeClient), (error) => error.statusCode === 409);
+  await assert.rejects(addDocumentLink({ ...args, entityType: "PARTNER", entityId: 999 }, fakeClient), (error) => error.statusCode === 404);
+  assert.equal(await addDocumentLink({ ...args, organizationId: 99, entityType: "PARTNER", entityId: 10 }, fakeClient), null);
+});
+
+test("DocumentLink removal is organization scoped and records cleanup", async () => {
+  let removed = false; const activities = [];
+  const fakeClient = {
+    $transaction: async (callback) => callback(fakeClient),
+    documentLink: { findFirst: async ({ where }) => where.organizationId === 42 ? { id: 8, documentId: 1, organizationId: 42, entityType: "INCOMING_INVOICE", entityId: 30, document: { name: "Bizonylat" } } : null, delete: async () => { removed = true; } },
+    activity: { create: async ({ data }) => { activities.push(data); return data; } },
+  };
+  assert.equal(await removeDocumentLink({ organizationId: 99, actorMemberId: 5, documentId: 1, linkId: 8 }, fakeClient), false);
+  assert.equal(removed, false);
+  assert.equal(await removeDocumentLink({ organizationId: 42, actorMemberId: 5, documentId: 1, linkId: 8 }, fakeClient), true);
+  assert.equal(activities[0].action, "DOCUMENT_REMOVED");
 });
 
 test("document controller rejects incomplete or invalid entity filters", async () => {

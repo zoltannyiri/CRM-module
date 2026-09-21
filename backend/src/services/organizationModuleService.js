@@ -13,6 +13,7 @@ export const DEFAULT_ORGANIZATION_MODULES = Object.freeze([
   "LEADS",
   "PIPELINE",
   "FOLLOW_UPS",
+  "INCOMING_INVOICES",
 ]);
 
 const moduleKeySet = new Set(MODULE_KEYS);

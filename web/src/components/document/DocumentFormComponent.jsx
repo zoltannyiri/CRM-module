@@ -1,20 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import apiClient from "../../api/apiClient.js";
 import { useToast } from "../../hooks/useToast.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import DocumentUploadField from "./DocumentUploadField.jsx";
+import { documentTypeOptions, normalizeDocumentType } from "./documentDisplay.js";
 
 const fieldClass =
   "h-11 w-full rounded-md border border-[#d7dedc] bg-white px-3.5 text-sm text-[#263338] outline-none transition placeholder:text-[#a1abaa] focus:border-[#79a97e] focus:ring-2 focus:ring-[#79a97e]/15 disabled:cursor-default disabled:bg-[#f5f7f6] disabled:text-[#536166]";
 const labelClass = "grid gap-2 text-xs font-medium text-[#536166]";
-
-const CATEGORY_OPTIONS = [
-  "Általános",
-  "Szerződés",
-  "Műszaki dokumentum",
-  "Pénzügyi dokumentum",
-  "Egyéb",
-];
 
 export default function DocumentFormComponent(props) {
   const { hasPermission } = useAuth();
@@ -37,6 +31,7 @@ function DocumentForm({
   document: doc,
   defaultPartnerId,
   defaultProjectId,
+  defaultIncomingInvoiceId,
   onClose,
   onSaved,
 }) {
@@ -53,26 +48,45 @@ function DocumentForm({
   const [selectedFile, setSelectedFile] = useState(null);
   const [name, setName] = useState(() => doc?.name || "");
   const [nameUserEdited, setNameUserEdited] = useState(() => Boolean(doc?.name));
-  const [category, setCategory] = useState(() => doc?.category || "Általános");
+  const [documentType, setDocumentType] = useState(() =>
+    normalizeDocumentType(doc?.documentType || (defaultIncomingInvoiceId ? "INVOICE" : "GENERAL")),
+  );
   const [partnerId, setPartnerId] = useState(() =>
     defaultPartnerId ? String(defaultPartnerId) : isEditing ? existingPartnerId : "",
   );
   const [projectId, setProjectId] = useState(() =>
     defaultProjectId ? String(defaultProjectId) : isEditing ? existingProjectId : "",
   );
-  const [note, setNote] = useState(() => doc?.note || "");
+  const [description, setDescription] = useState(() => doc?.description || "");
 
   const [partners, setPartners] = useState(() => (doc?.partner ? [doc.partner] : []));
   const [projects, setProjects] = useState(() => (doc?.project ? [doc.project] : []));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [active, setActive] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const closeRef = useRef(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setActive(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (closeRef.current) return;
+    closeRef.current = true;
+    setClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  }, [onClose]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !submitting) handleClose();
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -80,7 +94,7 @@ function DocumentForm({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [handleClose, submitting]);
 
   useEffect(() => {
     if (!canUsePartners) return;
@@ -139,28 +153,29 @@ function DocumentForm({
       if (isEditing) {
         const payload = {
           name: name.trim(),
-          category: category ? category.trim() : null,
-          note: note ? note.trim() : null,
+          documentType: normalizeDocumentType(documentType),
+          description: description.trim() || null,
           ...(canUsePartners && { partnerId: partnerId ? Number(partnerId) : null }),
           ...(canUseProjects && { projectId: projectId ? Number(projectId) : null }),
         };
         const response = await apiClient.patch(`/documents/${doc.id}`, payload);
         onSaved?.(response.data);
         showSuccess("A dokumentum adatai sikeresen módosultak.");
-        onClose();
+        handleClose();
       } else {
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("name", name.trim());
-        if (category) formData.append("category", category.trim());
-        if (note) formData.append("note", note.trim());
+        formData.append("documentType", normalizeDocumentType(documentType));
+        if (description) formData.append("description", description.trim());
         if (partnerId) formData.append("partnerId", partnerId);
         if (projectId) formData.append("projectId", projectId);
+        if (defaultIncomingInvoiceId) formData.append("incomingInvoiceId", defaultIncomingInvoiceId);
 
         const response = await apiClient.post("/documents", formData);
         onSaved?.(response.data);
         showSuccess("A dokumentum sikeresen feltöltve.");
-        onClose();
+        handleClose();
       }
     } catch (requestError) {
       const message =
@@ -183,11 +198,18 @@ function DocumentForm({
       <button
         type="button"
         aria-label="Dokumentum űrlap bezárása"
-        onClick={onClose}
-        className="starting:opacity-0 absolute inset-0 cursor-default border-0 bg-[#17272b]/35 backdrop-blur-[1px] transition-opacity duration-200"
+        onClick={handleClose}
+        disabled={submitting}
+        className={`starting:opacity-0 absolute inset-0 cursor-default border-0 bg-[#17272b]/35 backdrop-blur-[1px] transition-opacity duration-200 ease-out ${
+          active && !closing ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
       />
 
-      <aside className="starting:translate-x-full absolute inset-y-0 right-0 flex w-full flex-col border-l border-[#dbe1df] bg-[#f7f8f8] shadow-[-18px_0_50px_rgba(24,39,43,.12)] transition-transform duration-200 md:w-1/2 md:min-w-[640px] md:max-w-full">
+      <aside
+        className={`starting:translate-x-full absolute inset-y-0 right-0 flex w-full flex-col border-l border-[#dbe1df] bg-[#f7f8f8] shadow-[-18px_0_50px_rgba(24,39,43,.12)] transition-transform duration-200 ease-out md:w-1/2 md:min-w-[640px] md:max-w-full ${
+          active && !closing ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
         <header className="flex items-start justify-between gap-6 border-b border-[#dfe5e3] bg-white px-7 py-6">
           <div>
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[.13em] text-[#84918e]">
@@ -204,7 +226,8 @@ function DocumentForm({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={submitting}
             className="h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-4 text-xs font-medium text-[#4d5a5e] hover:bg-[#f4f6f5]"
           >
             Bezárás
@@ -225,25 +248,7 @@ function DocumentForm({
                     <span>
                       Fájl <span className="text-[#a43b2f]">*</span>
                     </span>
-                    <div className="flex items-center gap-3">
-                      <label className="inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-[#d7dedc] bg-[#fafbfb] px-4 text-xs font-medium text-[#344247] shadow-xs hover:bg-[#f1f4f3]">
-                        <span>Fájl kiválasztása</span>
-                        <input
-                          type="file"
-                          onChange={handleFileChange}
-                          className="sr-only"
-                          required
-                        />
-                      </label>
-                      <span className="truncate text-xs text-[#637175]">
-                        {selectedFile
-                          ? `${selectedFile.name} (${(selectedFile.size / 1024).toFixed(0)} KB)`
-                          : "Nincs fájl kiválasztva"}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-[#84908e]">
-                      Engedélyezett: PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPG, PNG (max. 20 MB)
-                    </span>
+                    <DocumentUploadField file={selectedFile} onChange={(file) => { setSelectedFile(file); if (file) handleFileChange({ target: { files: [file] } }); }} disabled={submitting} status={submitting ? "uploading" : "idle"} />
                   </label>
                 ) : (
                   <div className={`${labelClass} sm:col-span-2`}>
@@ -281,13 +286,13 @@ function DocumentForm({
                 <label className={labelClass}>
                   <span>Kategória</span>
                   <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
                     className={fieldClass}
                   >
-                    {CATEGORY_OPTIONS.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
+                    {documentTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
@@ -337,8 +342,8 @@ function DocumentForm({
               <h3 className="mb-5 text-sm font-semibold text-[#2b393e]">Megjegyzés</h3>
               <label className={labelClass}>
                 <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   rows={4}
                   className={`${fieldClass} h-auto resize-y py-3`}
                   placeholder="Megjegyzés a dokumentumról..."
@@ -360,7 +365,8 @@ function DocumentForm({
         <footer className="flex justify-end gap-3 border-t border-[#dfe5e3] bg-white px-7 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={submitting}
             className="h-10 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-5 text-xs font-medium text-[#455358] hover:bg-[#f5f7f6]"
           >
             Mégse

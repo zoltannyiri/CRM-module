@@ -16,6 +16,7 @@ const ALLOWED_MIME_TYPES = new Set([
   "text/plain",
   "image/jpeg",
   "image/png",
+  "image/webp",
 ]);
 
 const DISALLOWED_EXTENSIONS = new Set([
@@ -32,7 +33,48 @@ const DISALLOWED_EXTENSIONS = new Set([
   ".scr",
   ".jar",
 ]);
-const DOCUMENT_ENTITY_TYPES = new Set(["PARTNER", "PROJECT"]);
+const DOCUMENT_ENTITY_TYPES = new Set(["PARTNER", "PROJECT", "OFFER", "INCOMING_INVOICE"]);
+export const DOCUMENT_TYPES = new Set(["GENERAL", "CONTRACT", "INVOICE", "RECEIPT", "QUOTE", "PROJECT_FILE", "OTHER"]);
+const LEGACY_DOCUMENT_TYPES = new Map([
+  ["ÁLTALÁNOS", "GENERAL"],
+  ["SZERZŐDÉS", "CONTRACT"],
+  ["MŰSZAKI DOKUMENTUM", "PROJECT_FILE"],
+  ["PÉNZÜGYI DOKUMENTUM", "INVOICE"],
+  ["SZÁMLA", "INVOICE"],
+  ["NYUGTA", "RECEIPT"],
+  ["NYUGTA / BIZONYLAT", "RECEIPT"],
+  ["AJÁNLAT", "QUOTE"],
+  ["PROJEKTFÁJL", "PROJECT_FILE"],
+  ["EGYÉB", "OTHER"],
+]);
+
+export function normalizeDocumentType(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const upper = String(value).trim().toUpperCase();
+  if (DOCUMENT_TYPES.has(upper)) return upper;
+  if (LEGACY_DOCUMENT_TYPES.has(upper)) return LEGACY_DOCUMENT_TYPES.get(upper);
+  return null;
+}
+const ALLOWED_EXTENSIONS_BY_MIME = new Map([
+  ["application/pdf", new Set([".pdf"])],
+  ["application/msword", new Set([".doc"])],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", new Set([".docx"])],
+  ["application/vnd.ms-excel", new Set([".xls"])],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new Set([".xlsx"])],
+  ["text/csv", new Set([".csv"])],
+  ["text/plain", new Set([".txt"])],
+  ["image/jpeg", new Set([".jpg", ".jpeg"])],
+  ["image/png", new Set([".png"])],
+  ["image/webp", new Set([".webp"])],
+]);
+
+export function validateUploadMetadata(originalName, mimeType) {
+  const ext = path.extname(originalName || "").toLowerCase();
+  if (DISALLOWED_EXTENSIONS.has(ext)) return "Végrehajtható fájlok feltöltése nem engedélyezett.";
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) return "Ez a fájltípus nem támogatott.";
+  if (!ALLOWED_EXTENSIONS_BY_MIME.get(mimeType)?.has(ext)) return "A fájl kiterjesztése és MIME-típusa nem egyezik.";
+  return null;
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -40,15 +82,9 @@ const upload = multer({
     fileSize: MAX_FILE_SIZE,
   },
   fileFilter(req, file, cb) {
-    const ext = path.extname(file.originalname || "").toLowerCase();
-    if (DISALLOWED_EXTENSIONS.has(ext)) {
-      const error = new Error("Végrehajtható fájlok feltöltése nem engedélyezett.");
-      error.statusCode = 400;
-      return cb(error);
-    }
-
-    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      const error = new Error("Ez a fájltípus nem támogatott. Engedélyezett: PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPG, PNG.");
+    const validationError = validateUploadMetadata(file.originalname, file.mimetype);
+    if (validationError) {
+      const error = new Error(validationError);
       error.statusCode = 400;
       return cb(error);
     }
@@ -88,7 +124,12 @@ function parsePositiveId(value) {
 export async function getDocuments(req, res, next) {
   try {
     const query = String(req.query.q || "");
-    const category = req.query.category ? String(req.query.category) : undefined;
+    const rawDocumentType = req.query.documentType || req.query.category;
+    let documentType = undefined;
+    if (rawDocumentType && String(rawDocumentType).toUpperCase() !== "ALL") {
+      documentType = normalizeDocumentType(rawDocumentType);
+      if (!documentType) return res.status(400).json({ message: "Érvénytelen dokumentumtípus." });
+    }
     const entityType = req.query.entityType ? String(req.query.entityType).toUpperCase() : undefined;
     const entityId = parsePositiveId(req.query.entityId);
     const sortDirection = req.query.sortDirection === "asc" ? "asc" : "desc";
@@ -104,7 +145,7 @@ export async function getDocuments(req, res, next) {
       organizationId: req.organization.id,
       membership: req.membership,
       query,
-      category,
+      documentType,
       entityType,
       entityId,
       sortDirection,
@@ -150,8 +191,10 @@ export async function createDocument(req, res, next) {
       return res.status(400).json({ message: "A dokumentum megnevezése kötelező." });
     }
 
-    const category = typeof req.body.category === "string" ? req.body.category.trim() : null;
-    const note = typeof req.body.note === "string" ? req.body.note.trim() : null;
+    const rawType = req.body.documentType || req.body.category;
+    const documentType = rawType !== undefined && rawType !== "" ? normalizeDocumentType(rawType) : "GENERAL";
+    if (!documentType) return res.status(400).json({ message: "Érvénytelen dokumentumtípus." });
+    const description = typeof (req.body.description ?? req.body.note) === "string" ? String(req.body.description ?? req.body.note).trim() : null;
 
     let partnerId = null;
     if (req.body.partnerId !== undefined && req.body.partnerId !== "") {
@@ -169,16 +212,29 @@ export async function createDocument(req, res, next) {
       }
     }
 
+    let offerId = null;
+    if (req.body.offerId !== undefined && req.body.offerId !== "") {
+      offerId = parsePositiveId(req.body.offerId);
+      if (!offerId) return res.status(400).json({ message: "Érvénytelen ajánlatazonosító." });
+    }
+    let incomingInvoiceId = null;
+    if (req.body.incomingInvoiceId !== undefined && req.body.incomingInvoiceId !== "") {
+      incomingInvoiceId = parsePositiveId(req.body.incomingInvoiceId);
+      if (!incomingInvoiceId) return res.status(400).json({ message: "Érvénytelen számlaazonosító." });
+    }
+
     const document = await documentService.createDocument({
       organizationId: req.organization.id,
       actorMemberId: req.membership?.id || null,
       membership: req.membership,
       file: req.file,
       name,
-      category,
-      note,
+      documentType,
+      description,
       partnerId,
       projectId,
+      offerId,
+      incomingInvoiceId,
     });
 
     return res.status(201).json(document);
@@ -204,12 +260,16 @@ export async function updateDocument(req, res, next) {
       data.name = body.name.trim();
     }
 
-    if (body.category !== undefined) {
-      data.category = typeof body.category === "string" && body.category.trim() ? body.category.trim() : null;
+    if (body.documentType !== undefined || body.category !== undefined) {
+      const rawType = body.documentType ?? body.category;
+      const documentType = normalizeDocumentType(rawType);
+      if (!documentType) return res.status(400).json({ message: "Érvénytelen dokumentumtípus." });
+      data.documentType = documentType;
     }
 
-    if (body.note !== undefined) {
-      data.note = typeof body.note === "string" && body.note.trim() ? body.note.trim() : null;
+    if (body.description !== undefined || body.note !== undefined) {
+      const value = body.description ?? body.note;
+      data.description = typeof value === "string" && value.trim() ? value.trim() : null;
     }
 
     if (body.partnerId !== undefined) {
@@ -242,6 +302,29 @@ export async function updateDocument(req, res, next) {
   } catch (error) {
     return next(error);
   }
+}
+
+export async function addLink(req, res, next) {
+  try {
+    const documentId = parsePositiveId(req.params.id);
+    const entityId = parsePositiveId(req.body?.entityId);
+    const entityType = typeof req.body?.entityType === "string" ? req.body.entityType.toUpperCase() : "";
+    if (!documentId || !entityId || !DOCUMENT_ENTITY_TYPES.has(entityType)) return res.status(400).json({ message: "Érvénytelen dokumentumkapcsolat." });
+    const link = await documentService.addDocumentLink({ organizationId: req.organization.id, membership: req.membership, actorMemberId: req.membership.id, documentId, entityType, entityId });
+    if (!link) return res.status(404).json({ message: "A dokumentum nem található." });
+    return res.status(201).json(link);
+  } catch (error) { return next(error); }
+}
+
+export async function removeLink(req, res, next) {
+  try {
+    const documentId = parsePositiveId(req.params.id);
+    const linkId = parsePositiveId(req.params.linkId);
+    if (!documentId || !linkId) return res.status(400).json({ message: "Érvénytelen dokumentumkapcsolat." });
+    const removed = await documentService.removeDocumentLink({ organizationId: req.organization.id, actorMemberId: req.membership.id, documentId, linkId });
+    if (!removed) return res.status(404).json({ message: "A dokumentumkapcsolat nem található." });
+    return res.json({ message: "A dokumentumkapcsolat eltávolítva." });
+  } catch (error) { return next(error); }
 }
 
 export async function deleteDocument(req, res, next) {
@@ -314,4 +397,6 @@ export default {
   updateDocument,
   deleteDocument,
   downloadDocument,
+  addLink,
+  removeLink,
 };

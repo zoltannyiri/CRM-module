@@ -1,0 +1,3 @@
+# Runtime uploads are private application data, never source files.
+backend/storage/documents/**
+!backend/storage/documents/.gitkeep

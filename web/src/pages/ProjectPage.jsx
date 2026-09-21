@@ -10,6 +10,7 @@ import ProjectTasksComponent from "../components/project/ProjectTasksComponent.j
 import ProjectDocumentsComponent from "../components/project/ProjectDocumentsComponent.jsx";
 import ProjectActivityComponent from "../components/project/ProjectActivityComponent.jsx";
 import RelatedOffersComponent from "../components/offer/RelatedOffersComponent.jsx";
+import RelatedIncomingInvoicesComponent from "../components/incomingInvoice/RelatedIncomingInvoicesComponent.jsx";
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
@@ -100,6 +101,9 @@ export default function ProjectPage() {
               <TabPanel header="Ajánlatok">
                 <RelatedOffersComponent projectId={id} />
               </TabPanel>
+            )}
+            {hasModule("INCOMING_INVOICES") && hasPermission("INCOMING_INVOICES_VIEW") && (
+              <TabPanel header="Számlák / költségek"><RelatedIncomingInvoicesComponent projectId={id} /></TabPanel>
             )}
             {hasPermission("ACTIVITY_VIEW") && <TabPanel header="Tevékenységek">
               <ProjectActivityComponent projectId={id} />

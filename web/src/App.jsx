@@ -19,6 +19,7 @@ import LeadPage from "./pages/LeadPage.jsx";
 import OfferPage from "./pages/OfferPage.jsx";
 import PipelinePage from "./pages/PipelinePage.jsx";
 import FollowUpPage from "./pages/FollowUpPage.jsx";
+import IncomingInvoicePage from "./pages/IncomingInvoicePage.jsx";
 
 function Workspace({ children }) {
   return (
@@ -98,6 +99,8 @@ function App() {
         <Route path="/lead/:id" element={<Workspace><ModuleRoute module="LEADS"><PermissionRoute permission="LEADS_VIEW"><LeadPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/offer" element={<Workspace><ModuleRoute module="OFFERS"><PermissionRoute permission="OFFERS_VIEW"><OfferPage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route path="/offer/:id" element={<Workspace><ModuleRoute module="OFFERS"><PermissionRoute permission="OFFERS_VIEW"><OfferPage /></PermissionRoute></ModuleRoute></Workspace>} />
+        <Route path="/incoming-invoice" element={<Workspace><ModuleRoute module="INCOMING_INVOICES"><PermissionRoute permission="INCOMING_INVOICES_VIEW"><IncomingInvoicePage /></PermissionRoute></ModuleRoute></Workspace>} />
+        <Route path="/incoming-invoice/:id" element={<Workspace><ModuleRoute module="INCOMING_INVOICES"><PermissionRoute permission="INCOMING_INVOICES_VIEW"><IncomingInvoicePage /></PermissionRoute></ModuleRoute></Workspace>} />
         <Route
           path="/activity"
           element={

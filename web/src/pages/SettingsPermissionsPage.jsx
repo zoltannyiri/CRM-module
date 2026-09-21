@@ -78,6 +78,27 @@ const groups = [
       ["OFFERS_DELETE", "Törlés"],
     ],
   },
+  {
+    title: "Bejövő számlák",
+    module: "INCOMING_INVOICES",
+    permissions: [
+      ["INCOMING_INVOICES_VIEW", "Megtekintés"],
+      ["INCOMING_INVOICES_CREATE", "Létrehozás"],
+      ["INCOMING_INVOICES_EDIT", "Módosítás"],
+      ["INCOMING_INVOICES_DELETE", "Törlés"],
+    ],
+  },
+  {
+    title: "Dokumentumok",
+    module: "DOCUMENTS",
+    permissions: [
+      ["DOCUMENTS_VIEW", "Megtekintés"],
+      ["DOCUMENTS_CREATE", "Létrehozás"],
+      ["DOCUMENTS_EDIT", "Módosítás"],
+      ["DOCUMENTS_DELETE", "Törlés"],
+      ["DOCUMENTS_DOWNLOAD", "Letöltés"],
+    ],
+  },
   { title: "Tevékenységek", permissions: [["ACTIVITY_VIEW", "Megtekintés"]] },
   {
     title: "Egyéni mezők",

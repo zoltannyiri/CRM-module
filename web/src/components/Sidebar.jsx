@@ -12,6 +12,7 @@ const icons = {
   documents: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" /></>,
   leads: <><circle cx="12" cy="7" r="3" /><path d="M5 21v-3a7 7 0 0 1 14 0v3" /></>,
   offers: <><path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5" /></>,
+  invoices: <><path d="M6 2h12v20l-3-2-3 2-3-2-3 2Z" /><path d="M9 7h6M9 11h6M9 15h4" /></>,
   messages: <><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /><path d="M7 10h.01M12 10h.01M17 10h.01" /></>,
   activities: <path d="M2 12h4l4-9 4 18 4-9h4" />,
   settings: <><path d="m9 3-1 3-3 1-2 4 2 2v3l3 2 1 3h5l1-3 3-2v-3l2-2-2-4-3-1-1-3Z" /><circle cx="11.5" cy="12" r="3" /></>,
@@ -34,6 +35,7 @@ const navigation = [
   { id: "documents", label: "Dokumentumok", module: "DOCUMENTS", permission: "DOCUMENTS_VIEW", route: "/document" },
   { id: "leads", label: "Érdeklődők", module: "LEADS", permission: "LEADS_VIEW", route: "/lead" },
   { id: "offers", label: "Ajánlatok", module: "OFFERS", permission: "OFFERS_VIEW", route: "/offer" },
+  { id: "invoices", label: "Bejövő számlák", module: "INCOMING_INVOICES", permission: "INCOMING_INVOICES_VIEW", route: "/incoming-invoice" },
   { id: "products", label: "Termékek", children: ["Összes termék", "Kategóriák"] },
   { id: "messages", label: "Üzenetek" },
   { id: "activities", label: "Tevékenységek", children: ["Tevékenységek", "Feladatok", "Naptár"] },
@@ -57,6 +59,7 @@ const activeItemForPath = (pathname) => {
   if (pathname.startsWith("/document")) return "documents";
   if (pathname.startsWith("/lead")) return "leads";
   if (pathname.startsWith("/offer")) return "offers";
+  if (pathname.startsWith("/incoming-invoice")) return "invoices";
   if (pathname.startsWith("/activity")) return "activities-0";
   if (pathname.startsWith("/task")) return "activities-1";
   if (pathname.startsWith("/settings/custom-fields")) return "settings-1";

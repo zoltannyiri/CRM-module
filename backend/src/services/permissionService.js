@@ -3,10 +3,24 @@ import { PermissionKey } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 
 export const ALL_PERMISSION_KEYS = Object.freeze(Object.values(PermissionKey));
+
+export const RESTRICTED_USER_PERMISSIONS = Object.freeze(new Set([
+  "DOCUMENTS_CREATE",
+  "DOCUMENTS_EDIT",
+  "DOCUMENTS_DELETE",
+  "INCOMING_INVOICES_CREATE",
+  "INCOMING_INVOICES_EDIT",
+  "INCOMING_INVOICES_DELETE",
+]));
+
+export const DEFAULT_USER_PERMISSIONS = Object.freeze(
+  ALL_PERMISSION_KEYS.filter((permission) => !RESTRICTED_USER_PERMISSIONS.has(permission))
+);
+
 export const DEFAULT_PERMISSIONS_BY_ROLE = Object.freeze({
   OWNER: ALL_PERMISSION_KEYS,
   ADMIN: ALL_PERMISSION_KEYS,
-  USER: ALL_PERMISSION_KEYS,
+  USER: DEFAULT_USER_PERMISSIONS,
 });
 
 const permissionKeySet = new Set(ALL_PERMISSION_KEYS);

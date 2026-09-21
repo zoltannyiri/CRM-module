@@ -19,7 +19,7 @@ export default function DocumentPage() {
   const { showError } = useToast();
 
   const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [documentTypeFilter, setDocumentTypeFilter] = useState("ALL");
   const [sortDirection, setSortDirection] = useState("desc");
   const [formOpen, setFormOpen] = useState(false);
   const [activeDoc, setActiveDoc] = useState(null);
@@ -106,16 +106,18 @@ export default function DocumentPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-y border-[#e3e8e6] bg-white px-5 py-3 lg:px-7">
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
+            value={documentTypeFilter}
+            onChange={(event) => setDocumentTypeFilter(event.target.value)}
             aria-label="Dokumentum kategória"
             className={`${lightControl} min-w-[150px]`}>
             <option value="ALL">Minden kategória</option>
-            <option value="Általános">Általános</option>
-            <option value="Szerződés">Szerződés</option>
-            <option value="Műszaki dokumentum">Műszaki dokumentum</option>
-            <option value="Pénzügyi dokumentum">Pénzügyi dokumentum</option>
-            <option value="Egyéb">Egyéb</option>
+            <option value="GENERAL">Általános</option>
+            <option value="CONTRACT">Szerződés</option>
+            <option value="INVOICE">Számla</option>
+            <option value="RECEIPT">Nyugta / bizonylat</option>
+            <option value="QUOTE">Ajánlat</option>
+            <option value="PROJECT_FILE">Projektfájl</option>
+            <option value="OTHER">Egyéb</option>
           </select>
         </div>
         <div className="flex items-center gap-2">
@@ -145,7 +147,7 @@ export default function DocumentPage() {
       <div className="px-5 py-5">
         <DocumentListComponent
           query={query}
-          categoryFilter={categoryFilter}
+          documentTypeFilter={documentTypeFilter}
           sortDirection={sortDirection}
           reloadKey={reloadKey}
           onView={handleView}
