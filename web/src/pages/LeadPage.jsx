@@ -244,7 +244,17 @@ export default function LeadPage() {
         />
       </div>
       {drawer}
-      <ColumnSettingsDrawer open={columnsOpen} preference={listPreference.preference} loading={listPreference.loading} error={listPreference.error} onClose={() => setColumnsOpen(false)} onSave={listPreference.save} onReset={listPreference.reset} onChanged={() => setReloadKey((value) => value + 1)} />
+      <ColumnSettingsDrawer
+        open={columnsOpen}
+        preference={listPreference.preference}
+        loading={listPreference.loading}
+        error={listPreference.error}
+        onRetry={listPreference.reload}
+        onClose={() => setColumnsOpen(false)}
+        onSave={listPreference.save}
+        onReset={listPreference.reset}
+        onChanged={() => setReloadKey((value) => value + 1)}
+      />
     </div>
   );
 }

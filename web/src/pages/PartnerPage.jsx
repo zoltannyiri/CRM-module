@@ -283,7 +283,7 @@ export default function PartnerPage() {
           onSaved={handlePartnerSaved}
         />
       )}
-      <ColumnSettingsDrawer open={columnsOpen} preference={listPreference.preference} loading={listPreference.loading} error={listPreference.error} onClose={() => setColumnsOpen(false)} onSave={listPreference.save} onReset={listPreference.reset} onChanged={() => setListReloadKey((value) => value + 1)} />
+      <ColumnSettingsDrawer open={columnsOpen} preference={listPreference.preference} loading={listPreference.loading} error={listPreference.error} onRetry={listPreference.reload} onClose={() => setColumnsOpen(false)} onSave={listPreference.save} onReset={listPreference.reset} onChanged={() => setListReloadKey((value) => value + 1)} />
     </div>
   );
 }

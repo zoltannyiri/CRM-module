@@ -6,7 +6,7 @@ import apiClient from "../../api/apiClient.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useToast } from "../../hooks/useToast.js";
 import { formatLeadDate, memberName, leadStatusClasses, leadStatusLabels, leadSourceLabels } from "./leadDisplay.js";
-import { defaultListColumns, formatCustomFieldValue, columnIdentity } from "../configurableView/listColumns.js";
+import { defaultListColumns, formatCustomFieldValue, columnIdentity, resolveColumnLayout } from "../configurableView/listColumns.js";
 
 const cellClass = "h-[58px] border-r border-b border-[#e1e6e4] px-4 text-xs text-[#344247] last:border-r-0";
 const headerClass = "h-12 border-r border-b border-[#dbe1df] px-4 text-left text-[11px] font-medium text-[#445156] last:border-r-0";
@@ -98,8 +98,26 @@ export default function LeadListComponent({
     <section aria-labelledby={showTitle ? "lead-list-title" : undefined}>
       {showTitle && <div className="mb-4"><p className="mb-1 text-[10px] font-semibold tracking-[.12em] text-[#8a9693] uppercase">Értékesítés</p><h2 id="lead-list-title" className="text-base font-semibold text-[#29383d]">Érdeklődők</h2></div>}
       <div className="relative overflow-x-auto rounded-xl border border-[#dbe1df] bg-white shadow-[0_1px_2px_rgba(24,39,43,0.02)]" aria-busy={loading}>
-        <DataTable value={loading ? [] : visible} dataKey="id" unstyled tableClassName="w-full min-w-[900px] border-collapse text-left" onRowDoubleClick={(event) => canView && onView?.(event.data)} emptyMessage={<span className="block h-40 pt-16 text-center text-xs text-[#778286]">{loading ? "" : result.error || "Nincs megjeleníthető érdeklődő."}</span>}>
-          {columns.map((column) => <Column key={columnIdentity(column)} field={column.type === "CORE" ? column.key : undefined} header={column.label} headerClassName={headerClass} bodyClassName={cellClass} body={(lead) => column.type === "CORE" ? coreBody(column, lead) : formatCustomFieldValue(lead.customFieldValues?.[column.customFieldId], column.fieldType)} />)}
+        <DataTable value={loading ? [] : visible} dataKey="id" unstyled tableClassName="w-full min-w-[1120px] border-collapse text-left" onRowDoubleClick={(event) => canView && onView?.(event.data)} emptyMessage={<span className="block h-40 pt-16 text-center text-xs text-[#778286]">{loading ? "" : result.error || "Nincs megjeleníthető érdeklődő."}</span>}>
+          {columns.map((column) => {
+            const layout = resolveColumnLayout("LEAD", column);
+            const hClass = layout.headerClassName ? `${headerClass} ${layout.headerClassName}` : headerClass;
+            const bClass = layout.bodyClassName ? `${cellClass} ${layout.bodyClassName}` : cellClass;
+            return (
+              <Column
+                key={columnIdentity(column)}
+                field={column.type === "CORE" ? column.key : undefined}
+                header={column.label}
+                headerClassName={hClass}
+                bodyClassName={bClass}
+                body={(lead) =>
+                  column.type === "CORE"
+                    ? coreBody(column, lead)
+                    : formatCustomFieldValue(lead.customFieldValues?.[column.customFieldId], column.fieldType)
+                }
+              />
+            );
+          })}
           {hasActions && <Column header="Műveletek" headerClassName={`${headerClass} w-32 text-center`} bodyClassName={`${cellClass} w-32`} body={(lead) => <div className="flex items-center justify-center gap-1">
             {canView && <button type="button" onClick={() => onView?.(lead)} className={actionButtonClass} title="Megtekintés" aria-label={`${lead.name} megtekintése`}><i className="pi pi-eye" aria-hidden="true" /></button>}
             {canEdit && <button type="button" onClick={() => onEdit?.(lead)} className={actionButtonClass} title="Szerkesztés" aria-label={`${lead.name} szerkesztése`}><i className="pi pi-pencil" aria-hidden="true" /></button>}

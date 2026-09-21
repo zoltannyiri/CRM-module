@@ -1,6 +1,6 @@
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
-import { columnIdentity, defaultListColumns, formatCustomFieldValue } from "../configurableView/listColumns.js";
+import { columnIdentity, defaultListColumns, formatCustomFieldValue, resolveColumnLayout } from "../configurableView/listColumns.js";
 
 const cellClass = "h-[58px] border-r border-b border-[#e1e6e4] px-4 text-xs text-[#344247] last:border-r-0";
 const headerClass = "h-12 border-r border-b border-[#dbe1df] px-4 text-left text-[11px] font-medium text-[#445156] last:border-r-0";
@@ -174,7 +174,25 @@ export default function PartnerTableView({
           headerClassName={`${headerClass} w-14 px-5`}
           bodyClassName={`${cellClass} w-14 px-5`}
         />
-        {columns.map((column) => <Column key={columnIdentity(column)} field={column.type === "CORE" ? column.key : undefined} header={column.label} body={(partner) => column.type === "CORE" ? coreBody(column, partner) : formatCustomFieldValue(partner.customFieldValues?.[column.customFieldId], column.fieldType)} headerClassName={headerClass} bodyClassName={cellClass} />)}
+        {columns.map((column) => {
+          const layout = resolveColumnLayout("PARTNER", column);
+          const hClass = layout.headerClassName ? `${headerClass} ${layout.headerClassName}` : headerClass;
+          const bClass = layout.bodyClassName ? `${cellClass} ${layout.bodyClassName}` : cellClass;
+          return (
+            <Column
+              key={columnIdentity(column)}
+              field={column.type === "CORE" ? column.key : undefined}
+              header={column.label}
+              body={(partner) =>
+                column.type === "CORE"
+                  ? coreBody(column, partner)
+                  : formatCustomFieldValue(partner.customFieldValues?.[column.customFieldId], column.fieldType)
+              }
+              headerClassName={hClass}
+              bodyClassName={bClass}
+            />
+          );
+        })}
         {hasActions && (
           <Column
             header="Műveletek"

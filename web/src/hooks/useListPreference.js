@@ -36,12 +36,22 @@ export function useListPreference(entityType, { enabled = true } = {}) {
   }, [enabled, entityType]);
 
   const save = async (columns) => {
+    if (error) {
+      throw new Error("Betöltési hiba esetén az oszlopbeállítások nem menthetők.");
+    }
     const { data } = await apiClient.put(`/view-preferences/${entityType}`, { columns: columns.map(storedColumn) }, { skipGlobalErrorToast: true });
-    setPreference(data); return data;
+    setPreference(data);
+    setError("");
+    return data;
   };
   const reset = async () => {
+    if (error) {
+      throw new Error("Betöltési hiba esetén az alapértelmezett oszlopok nem állíthatók vissza.");
+    }
     const { data } = await apiClient.delete(`/view-preferences/${entityType}`, { skipGlobalErrorToast: true });
-    setPreference(data); return data;
+    setPreference(data);
+    setError("");
+    return data;
   };
   return { preference, loading, error, save, reset, reload: load };
 }
