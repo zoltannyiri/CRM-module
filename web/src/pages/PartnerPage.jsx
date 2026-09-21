@@ -15,6 +15,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
 import ColumnSettingsDrawer from "../components/configurableView/ColumnSettingsDrawer.jsx";
 import { useListPreference } from "../hooks/useListPreference.js";
+import FilterPanel from "../components/filtering/FilterPanel.jsx";
 
 const iconPaths = {
   filter: <path d="M4 6h16M7 12h10m-7 6h4" />,
@@ -65,6 +66,8 @@ export default function PartnerPage() {
   const [listReloadKey, setListReloadKey] = useState(0);
   const [viewMode, setViewMode] = useState(getStoredViewMode);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState([]);
   const listPreference = useListPreference("PARTNER", { enabled: !id });
 
   const handleViewModeChange = (mode) => {
@@ -182,9 +185,17 @@ export default function PartnerPage() {
               className="pointer-events-none absolute top-1/2 right-3 size-3.5 -translate-y-1/2"
             />
           </div>
-          <button type="button" className={lightButton}>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            className={`${lightButton} ${advancedFilters.length > 0 ? "border-[#78ad7d] text-[#24482b]" : ""} ${filtersOpen ? "bg-[#f0f4f2] border-[#b0c0bc]" : ""}`}
+          >
             <Icon name="filter" className="size-3.5 text-[#748084]" />
-            Szűrés
+            Szűrők{advancedFilters.length > 0 ? ` (${advancedFilters.length})` : ""}
+            <Icon
+              name="chevron"
+              className={`size-3 transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+            />
           </button>
         </div>
 
@@ -260,6 +271,15 @@ export default function PartnerPage() {
       </div>
 
       <div className="px-5 py-5">
+        <FilterPanel
+          isOpen={filtersOpen}
+          entityType="PARTNER"
+          columns={listPreference.preference.columns}
+          availableColumns={listPreference.preference.availableColumns}
+          activeFilters={advancedFilters}
+          onClose={() => setFiltersOpen(false)}
+          onApply={setAdvancedFilters}
+        />
         <PartnerListComponent
           query={query}
           typeFilter={typeFilter}
@@ -272,6 +292,7 @@ export default function PartnerPage() {
           canDelete={hasPermission("PARTNERS_DELETE")}
           canView={hasPermission("PARTNERS_VIEW")}
           columns={listPreference.preference.columns}
+          filters={advancedFilters}
         />
       </div>
 

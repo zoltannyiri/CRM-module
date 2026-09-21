@@ -53,7 +53,7 @@ export async function getResolvedPreference({ organizationId, organizationMember
     client.customField.findMany({
       where: { organizationId, entityType, active: true },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-      select: { id: true, label: true, fieldType: true },
+      select: { id: true, label: true, fieldType: true, options: true },
     }),
   ]);
   const customById = new Map(customFields.map((field) => [field.id, field]));
@@ -66,7 +66,7 @@ export async function getResolvedPreference({ organizationId, organizationMember
   if (!columns.some((column) => column.type === "CORE" && column.key === "name")) columns.unshift(enrichCore(entityType, { type: "CORE", key: "name" }));
   const availableColumns = [
     ...CORE_COLUMN_REGISTRY[entityType].map((column) => ({ type: "CORE", key: column.key, label: column.label, required: column.required === true })),
-    ...customFields.map((field) => ({ type: "CUSTOM_FIELD", customFieldId: field.id, label: field.label, fieldType: field.fieldType })),
+    ...customFields.map((field) => ({ type: "CUSTOM_FIELD", customFieldId: field.id, label: field.label, fieldType: field.fieldType, options: field.options })),
   ];
   return { entityType, version: preference?.version || 1, customized: Boolean(preference), columns, availableColumns };
 }

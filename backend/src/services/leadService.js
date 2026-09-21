@@ -2,6 +2,7 @@ import prisma from "../lib/prisma.js";
 import activityService from "./activityService.js";
 import { createPartnerInTransaction } from "./partnerService.js";
 import customFieldService from "./customFieldService.js";
+import { buildCoreFilterPrismaWhere, resolveCustomFieldMatchingEntityIds } from "./filterService.js";
 
 const memberSelect = { id: true, user: { select: { firstName: true, lastName: true } } };
 export function buildLeadSelect({ includeConvertedPartner = false } = {}) { return {
@@ -12,16 +13,33 @@ export function buildLeadSelect({ includeConvertedPartner = false } = {}) { retu
   ...(includeConvertedPartner && { convertedPartner: { select: { id: true, name: true } } }),
 }; }
 
-export async function getLeads({ organizationId, status, source, assignedMemberId, search = "", sortDirection = "desc", includeConvertedPartner = false, customFieldIds = [] }, client = prisma) {
+export async function getLeads({ organizationId, status, source, assignedMemberId, search = "", sortDirection = "desc", includeConvertedPartner = false, customFieldIds = [], filters = [] }, client = prisma) {
   const term = search.trim();
+  const coreFilters = filters.filter((f) => f.field?.type === "CORE");
+  const customFieldFilters = filters.filter((f) => f.field?.type === "CUSTOM_FIELD");
+
+  const coreWhere = buildCoreFilterPrismaWhere(coreFilters);
+  const customFieldMatching = await resolveCustomFieldMatchingEntityIds(
+    { organizationId, entityType: "LEAD", customFieldFilters },
+    client
+  );
+
+  const where = {
+    organizationId,
+    ...(status !== undefined && { status }),
+    ...(source !== undefined && { source }),
+    ...(assignedMemberId !== undefined && { assignedMemberId }),
+    ...(term && { OR: ["name", "companyName", "email", "phone"].map((field) => ({ [field]: { contains: term, mode: "insensitive" } })) }),
+    ...(coreWhere.length > 0 ? { AND: coreWhere } : {}),
+    ...(customFieldMatching !== null
+      ? (customFieldMatching.in !== undefined
+          ? { id: { in: customFieldMatching.in } }
+          : { id: { notIn: customFieldMatching.notIn } })
+      : {}),
+  };
+
   const leads = await client.lead.findMany({
-    where: {
-      organizationId,
-      ...(status !== undefined && { status }),
-      ...(source !== undefined && { source }),
-      ...(assignedMemberId !== undefined && { assignedMemberId }),
-      ...(term && { OR: ["name", "companyName", "email", "phone"].map((field) => ({ [field]: { contains: term, mode: "insensitive" } })) }),
-    },
+    where,
     select: buildLeadSelect({ includeConvertedPartner }),
     orderBy: [{ createdAt: sortDirection }, { id: sortDirection }],
   });

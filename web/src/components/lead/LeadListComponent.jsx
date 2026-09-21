@@ -26,6 +26,7 @@ export default function LeadListComponent({
   canDelete = false,
   showTitle = true,
   columns = defaultListColumns.LEAD,
+  filters = [],
 }) {
   const { showSuccess, showError } = useToast();
   const { hasModule, hasPermission } = useAuth();
@@ -34,7 +35,7 @@ export default function LeadListComponent({
   canDelete = canDelete && hasPermission("LEADS_DELETE");
   const [result, setResult] = useState({ leads: [], resolvedKey: null, error: "" });
   const [page, setPage] = useState(1);
-  const paginationKey = JSON.stringify([query, statusFilter, sourceFilter, assignedMemberId, sortDirection]);
+  const paginationKey = JSON.stringify([query, statusFilter, sourceFilter, assignedMemberId, sortDirection, filters]);
   const [previousPaginationKey, setPreviousPaginationKey] = useState(paginationKey);
   if (previousPaginationKey !== paginationKey) {
     setPreviousPaginationKey(paginationKey);
@@ -42,7 +43,7 @@ export default function LeadListComponent({
   }
   const [deletingId, setDeletingId] = useState(null);
   const rowsPerPage = 10;
-  const requestKey = JSON.stringify([query, statusFilter, sourceFilter, assignedMemberId, sortDirection, reloadKey]);
+  const requestKey = JSON.stringify([query, statusFilter, sourceFilter, assignedMemberId, sortDirection, reloadKey, filters]);
   const loading = result.resolvedKey !== requestKey;
   const hasActions = canView || canEdit || canDelete;
 
@@ -56,6 +57,7 @@ export default function LeadListComponent({
         ...(sourceFilter !== "ALL" ? { source: sourceFilter } : {}),
         ...(assignedMemberId ? { assignedMemberId } : {}),
         sortDirection,
+        ...(filters && filters.length > 0 ? { filters: JSON.stringify(filters) } : {}),
       },
     }).then(({ data }) => {
       if (active) setResult({ leads: data, resolvedKey: requestKey, error: "" });
@@ -63,7 +65,7 @@ export default function LeadListComponent({
       if (active) setResult({ leads: [], resolvedKey: requestKey, error: error.response?.data?.message || "Az érdeklődők betöltése sikertelen." });
     });
     return () => { active = false; };
-  }, [canView, assignedMemberId, sourceFilter, query, reloadKey, requestKey, sortDirection, statusFilter]);
+  }, [canView, assignedMemberId, sourceFilter, query, reloadKey, requestKey, sortDirection, statusFilter, filters]);
 
   const pageCount = Math.max(1, Math.ceil(result.leads.length / rowsPerPage));
   const currentPage = Math.min(page, pageCount);

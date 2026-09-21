@@ -1,12 +1,30 @@
 import prisma from "../lib/prisma.js";
 import activityService from "./activityService.js";
 import customFieldService from "./customFieldService.js";
+import { buildCoreFilterPrismaWhere, resolveCustomFieldMatchingEntityIds } from "./filterService.js";
 
-async function getPartners({ organizationId, customFieldIds = [] }, client = prisma) {
+async function getPartners({ organizationId, customFieldIds = [], filters = [] }, client = prisma) {
+  const coreFilters = filters.filter((f) => f.field?.type === "CORE");
+  const customFieldFilters = filters.filter((f) => f.field?.type === "CUSTOM_FIELD");
+
+  const coreWhere = buildCoreFilterPrismaWhere(coreFilters);
+  const customFieldMatching = await resolveCustomFieldMatchingEntityIds(
+    { organizationId, entityType: "PARTNER", customFieldFilters },
+    client
+  );
+
+  const where = {
+    organizationId,
+    ...(coreWhere.length > 0 ? { AND: coreWhere } : {}),
+    ...(customFieldMatching !== null
+      ? (customFieldMatching.in !== undefined
+          ? { id: { in: customFieldMatching.in } }
+          : { id: { notIn: customFieldMatching.notIn } })
+      : {}),
+  };
+
   const partners = await client.partner.findMany({
-    where: {
-      organizationId,
-    },
+    where,
     include: {
       contacts: true,
     },

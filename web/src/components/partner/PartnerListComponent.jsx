@@ -47,12 +47,21 @@ export default function PartnerListComponent({
   canDelete = false,
   canView = true,
   columns,
+  filters = [],
 }) {
   const { showSuccess, showError } = useToast();
   const [partners, setPartners] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const filtersKey = JSON.stringify(filters);
+  const [previousFiltersKey, setPreviousFiltersKey] = useState(filtersKey);
+  if (previousFiltersKey !== filtersKey) {
+    setPreviousFiltersKey(filtersKey);
+    setPage(1);
+  }
+  const requestKey = JSON.stringify([reloadKey, filtersKey]);
+  const [resolvedKey, setResolvedKey] = useState(null);
+  const loading = resolvedKey !== requestKey;
   const [loadError, setLoadError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const [internalViewMode] = useState(getStoredViewMode);
@@ -119,7 +128,11 @@ export default function PartnerListComponent({
     let active = true;
 
     apiClient
-      .get("/partners")
+      .get("/partners", {
+        params: {
+          ...(filters && filters.length > 0 ? { filters: JSON.stringify(filters) } : {}),
+        },
+      })
       .then(({ data }) => {
         if (active) {
           setPartners(data);
@@ -130,13 +143,13 @@ export default function PartnerListComponent({
         if (active) setLoadError(error.message || "A partnerlista betöltése sikertelen.");
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setResolvedKey(requestKey);
       });
 
     return () => {
       active = false;
     };
-  }, [reloadKey]);
+  }, [filters, filtersKey, reloadKey, requestKey]);
 
   return (
     <section className="bg-[#f3f5f6] px-5 pb-5" aria-labelledby="partner-list-title">

@@ -6,6 +6,8 @@ import { isModuleEnabled } from "../services/organizationModuleService.js";
 import { normalizePartnerPayload } from "../validation/partnerValidation.js";
 import viewPreferenceService from "../services/viewPreferenceService.js";
 
+import { normalizeFilters as normalizeAdvancedFilters } from "../validation/filterValidation.js";
+
 export const LEAD_STATUSES = new Set(["NEW", "CONTACTED", "QUALIFIED", "LOST"]);
 export const LEAD_SOURCES = new Set(["WEBSITE", "REFERRAL", "PHONE", "EMAIL", "SOCIAL", "OTHER"]);
 const fields = new Set(["name", "companyName", "email", "phone", "note", "status", "source", "assignedMemberId", "customFieldValues"]);
@@ -87,9 +89,20 @@ async function getLeads(req, res, next) {
   try {
     const normalized = normalizeFilters(req.query);
     if (normalized.error) return res.status(400).json({ message: normalized.error });
+
+    let advancedFilters = [];
+    if (req.query.filters !== undefined) {
+      const normAdv = await normalizeAdvancedFilters(req.query.filters, {
+        organizationId: req.organization.id,
+        entityType: "LEAD",
+      });
+      if (normAdv.error) return res.status(400).json({ message: normAdv.error });
+      advancedFilters = normAdv.data;
+    }
+
     const preference = await viewPreferenceService.getResolvedPreference({ organizationId: req.organization.id, organizationMemberId: req.membership.id, entityType: "LEAD" });
     const customFieldIds = preference.columns.filter(({ type }) => type === "CUSTOM_FIELD").map(({ customFieldId }) => customFieldId);
-    return res.json(await leadService.getLeads({ organizationId: req.organization.id, includeConvertedPartner: await canViewConvertedPartner(req), customFieldIds, ...normalized.data }));
+    return res.json(await leadService.getLeads({ organizationId: req.organization.id, includeConvertedPartner: await canViewConvertedPartner(req), customFieldIds, filters: advancedFilters, ...normalized.data }));
   } catch (error) { return next(error); }
 }
 

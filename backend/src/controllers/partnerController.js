@@ -4,6 +4,7 @@ import { normalizeCustomFieldValues } from '../validation/customFieldValidation.
 import viewPreferenceService from '../services/viewPreferenceService.js';
 import { buildPartnerExport, exportContentTypes } from '../services/partnerExportService.js';
 import { normalizePartnerPayload } from '../validation/partnerValidation.js';
+import { normalizeFilters as normalizeAdvancedFilters } from '../validation/filterValidation.js';
 
 function positiveId(value) {
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
@@ -13,11 +14,22 @@ function positiveId(value) {
 
 async function getPartners(req, res, next) {
   try {
+    let advancedFilters = [];
+    if (req.query.filters !== undefined) {
+      const normAdv = await normalizeAdvancedFilters(req.query.filters, {
+        organizationId: req.organization.id,
+        entityType: 'PARTNER',
+      });
+      if (normAdv.error) return res.status(400).json({ message: normAdv.error });
+      advancedFilters = normAdv.data;
+    }
+
     const preference = await viewPreferenceService.getResolvedPreference({ organizationId: req.organization.id, organizationMemberId: req.membership.id, entityType: 'PARTNER' });
     const customFieldIds = preference.columns.filter(({ type }) => type === 'CUSTOM_FIELD').map(({ customFieldId }) => customFieldId);
     const partners = await partnerService.getPartners({
       organizationId: req.organization.id,
       customFieldIds,
+      filters: advancedFilters,
     });
 
     return res.json(partners);

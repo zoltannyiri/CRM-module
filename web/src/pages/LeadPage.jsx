@@ -18,6 +18,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
 import ColumnSettingsDrawer from "../components/configurableView/ColumnSettingsDrawer.jsx";
 import { useListPreference } from "../hooks/useListPreference.js";
+import FilterPanel from "../components/filtering/FilterPanel.jsx";
 
 const lightControl =
   "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] outline-none shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9] disabled:cursor-wait disabled:opacity-60";
@@ -41,6 +42,8 @@ export default function LeadPage() {
   const [conversionLead, setConversionLead] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState([]);
   const listPreference = useListPreference("LEAD", { enabled: !id });
   const canCreate = hasPermission("LEADS_CREATE");
 
@@ -205,6 +208,18 @@ export default function LeadPage() {
           </button>
           <button
             type="button"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            className={`${lightControl} ${advancedFilters.length > 0 ? "border-[#78ad7d] text-[#24482b]" : ""} ${filtersOpen ? "bg-[#f0f4f2] border-[#b0c0bc]" : ""}`}
+          >
+            <i className="pi pi-filter mr-2 text-[10px]" aria-hidden="true" />
+            Szűrők{advancedFilters.length > 0 ? ` (${advancedFilters.length})` : ""}
+            <i
+              className={`pi pi-chevron-down ml-1 text-[9px] text-[#748084] transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            type="button"
             onClick={() => setColumnsOpen(true)}
             className={lightControl}
           >
@@ -223,6 +238,16 @@ export default function LeadPage() {
         </div>
       </div>
       <div className="px-5 py-5">
+        <FilterPanel
+          isOpen={filtersOpen}
+          entityType="LEAD"
+          columns={listPreference.preference.columns}
+          availableColumns={listPreference.preference.availableColumns}
+          members={members}
+          activeFilters={advancedFilters}
+          onClose={() => setFiltersOpen(false)}
+          onApply={setAdvancedFilters}
+        />
         {membersError && (
           <p role="alert" className="mb-4 text-xs text-[#9a4335]">
             {membersError}
@@ -241,6 +266,7 @@ export default function LeadPage() {
           canEdit={hasPermission("LEADS_EDIT")}
           canDelete={hasPermission("LEADS_DELETE")}
           columns={listPreference.preference.columns}
+          filters={advancedFilters}
         />
       </div>
       {drawer}
