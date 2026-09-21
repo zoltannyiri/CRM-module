@@ -187,6 +187,7 @@ model Organization {
   followUps         FollowUp[]
   customFields      CustomField[]
   customFieldValues CustomFieldValue[]
+  listPreferences EntityListPreference[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -224,6 +225,7 @@ model OrganizationMember {
   convertedLeads Lead[] @relation("LeadConverter")
   assignedFollowUps FollowUp[] @relation("FollowUpAssignee")
   createdFollowUps FollowUp[] @relation("FollowUpCreator")
+  listPreferences EntityListPreference[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -680,4 +682,21 @@ model CustomFieldValue {
   @@unique([customFieldId, entityId])
   @@index([organizationId, entityType, entityId])
   @@index([customFieldId])
+}
+
+model EntityListPreference {
+  id                   Int                   @id @default(autoincrement())
+  organizationId       Int
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationMemberId Int
+  organizationMember   OrganizationMember    @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  entityType            CustomFieldEntityType
+  version               Int                   @default(1)
+  columns               Json
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@unique([organizationMemberId, entityType])
+  @@index([organizationId, entityType])
+  @@index([organizationMemberId, organizationId])
 }

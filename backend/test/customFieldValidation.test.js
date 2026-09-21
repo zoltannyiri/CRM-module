@@ -25,13 +25,16 @@ test("CustomField definition create requires key, label, fieldType and validates
 });
 
 test("CustomField definition update rejects key and fieldType mutations and allows partial updates", () => {
-  const update = normalizeCustomFieldDefinition({ label: "Updated", sortOrder: 5, required: true }, { partial: true });
+  const existingField = { label: "Original", fieldType: "TEXT", options: null, defaultValue: null };
+  const update = normalizeCustomFieldDefinition({ label: "Updated", sortOrder: 5, required: true }, { partial: true, existingField });
   assert.equal(update.error, undefined);
   assert.equal(update.data.label, "Updated");
   assert.equal(update.data.sortOrder, 5);
   assert.equal(update.data.required, true);
   assert.equal(update.data.key, undefined);
   assert.equal(update.data.fieldType, undefined);
+  assert.ok(normalizeCustomFieldDefinition({ fieldType: "NUMBER" }, { partial: true, existingField }).error);
+  assert.ok(normalizeCustomFieldDefinition({ key: "changed" }, { partial: true, existingField }).error);
 });
 
 test("CustomField definition options validation for SELECT and MULTI_SELECT", () => {
@@ -40,6 +43,27 @@ test("CustomField definition options validation for SELECT and MULTI_SELECT", ()
   const ok = normalizeCustomFieldDefinition({ key: "cat", label: "Cat", fieldType: "SELECT", options: ["A", "B"] });
   assert.equal(ok.error, undefined);
   assert.deepEqual(ok.data.options, ["A", "B"]);
+  assert.deepEqual(normalizeCustomFieldDefinition({ options: [" A ", "B"] }, { partial: true, existingField: { label: "Cat", fieldType: "SELECT", options: ["A"], defaultValue: null } }).data.options, ["A", "B"]);
+  assert.ok(normalizeCustomFieldDefinition({ options: [] }, { partial: true, existingField: { label: "Cat", fieldType: "SELECT", options: ["A"], defaultValue: null } }).error);
+  assert.ok(normalizeCustomFieldDefinition({ options: ["A", " A "] }, { partial: true, existingField: { label: "Cat", fieldType: "SELECT", options: ["A"], defaultValue: null } }).error);
+  assert.ok(normalizeCustomFieldDefinition({ options: ["A"] }, { partial: true, existingField: { label: "Cat", fieldType: "TEXT", options: null, defaultValue: null } }).error);
+});
+
+test("CustomField defaultValue follows the effective persisted field type and options", () => {
+  const definition = (fieldType, defaultValue, options) => normalizeCustomFieldDefinition({ key: "field", label: "Field", fieldType, defaultValue, ...(options !== undefined && { options }) });
+  assert.equal(definition("NUMBER", "42.5").data.defaultValue, "42.5");
+  assert.ok(definition("NUMBER", "not-a-number").error);
+  assert.equal(definition("BOOLEAN", true).data.defaultValue, "true");
+  assert.ok(definition("BOOLEAN", "yes").error);
+  assert.equal(definition("DATE", "2026-09-20").data.defaultValue, "2026-09-20");
+  assert.ok(definition("DATE", "2026-02-31").error);
+  assert.equal(definition("SELECT", "A", ["A", "B"]).data.defaultValue, "A");
+  assert.ok(definition("SELECT", "C", ["A", "B"]).error);
+  assert.equal(definition("MULTI_SELECT", '["A","B"]', ["A", "B"]).data.defaultValue, '["A","B"]');
+  assert.ok(definition("MULTI_SELECT", '["C"]', ["A", "B"]).error);
+  assert.ok(definition("TEXT", 42).error);
+  assert.ok(definition("DATE", true).error);
+  assert.ok(normalizeCustomFieldDefinition({ options: ["B"] }, { partial: true, existingField: { label: "Select", fieldType: "SELECT", options: ["A", "B"], defaultValue: "A" } }).error);
 });
 
 test("CustomField values validation enforces required, types, and options", () => {

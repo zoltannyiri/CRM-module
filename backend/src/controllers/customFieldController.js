@@ -29,6 +29,7 @@ const listFields = async (req, res, next) => {
 
 const createField = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) return res.status(400).json({ message: 'Érvénytelen egyéni mező adatok.' });
     const { entityType, ...rest } = req.body;
     if (entityType !== 'LEAD' && entityType !== 'PARTNER') {
       return res.status(400).json({ message: 'Érvénytelen entitás típus.' });
@@ -58,7 +59,10 @@ const updateField = async (req, res, next) => {
     const id = positiveId(req.params.id);
     if (!id) return res.status(400).json({ message: 'Érvénytelen azonosító.' });
 
-    const { data, error } = normalizeCustomFieldDefinition(req.body, { partial: true });
+    const existingField = await customFieldService.getCustomFieldById({ organizationId: req.organization.id, id });
+    if (!existingField) return res.status(404).json({ message: 'Mező nem található.' });
+
+    const { data, error } = normalizeCustomFieldDefinition(req.body, { partial: true, existingField });
     if (error) {
       return res.status(400).json({ message: error });
     }
@@ -75,6 +79,7 @@ const updateField = async (req, res, next) => {
 
     res.json(updated);
   } catch (error) {
+    if (error.statusCode === 409) return res.status(409).json({ message: error.message, ...(error.code && { code: error.code }) });
     next(error);
   }
 };

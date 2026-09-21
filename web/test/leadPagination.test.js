@@ -8,7 +8,7 @@ const source = await readFile(new URL("../src/components/lead/LeadListComponent.
 const start = source.indexOf("export default function LeadListComponent(");
 const end = source.indexOf("  if (!canView) return null;", start);
 assert.ok(start >= 0 && end > start);
-const createComponent = new Function("useState", "useMemo", "useEffect", "useAuth", "useToast",
+const createComponent = new Function("useState", "useMemo", "useEffect", "useAuth", "useToast", "defaultListColumns",
   source.slice(start, end).replace("export default ", "") +
   "\n return { page, currentPage, setPage, setResult };\n}\nreturn LeadListComponent;");
 
@@ -26,7 +26,8 @@ function paginationHarness() {
   };
   const component = createComponent(useState, (callback) => callback(), () => {},
     () => ({ hasModule: () => true, hasPermission: () => true }),
-    () => ({ showSuccess: () => {}, showError: () => {} }));
+    () => ({ showSuccess: () => {}, showError: () => {} }),
+    { LEAD: [] });
   const render = (props = {}) => {
     for (let attempt = 0; attempt < 10; attempt++) {
       index = 0;

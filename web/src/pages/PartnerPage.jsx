@@ -13,6 +13,8 @@ import PartnerActivityComponent from "../components/partner/PartnerActivityCompo
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
+import ColumnSettingsDrawer from "../components/configurableView/ColumnSettingsDrawer.jsx";
+import { useListPreference } from "../hooks/useListPreference.js";
 
 const iconPaths = {
   filter: <path d="M4 6h16M7 12h10m-7 6h4" />,
@@ -62,6 +64,8 @@ export default function PartnerPage() {
   const [formMode, setFormMode] = useState("create");
   const [listReloadKey, setListReloadKey] = useState(0);
   const [viewMode, setViewMode] = useState(getStoredViewMode);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const listPreference = useListPreference("PARTNER", { enabled: !id });
 
   const handleViewModeChange = (mode) => {
     if (mode === "table" || mode === "cards") {
@@ -204,6 +208,7 @@ export default function PartnerPage() {
             sortDirection={sortDirection}
             buttonClassName={lightButton}
           />
+          <button type="button" onClick={() => setColumnsOpen(true)} className={lightButton}><i className="pi pi-table text-xs" aria-hidden="true" />Oszlopok</button>
 
           {/* Table / Cards nézetváltó kapcsoló */}
           <div
@@ -266,6 +271,7 @@ export default function PartnerPage() {
           canEdit={hasPermission("PARTNERS_EDIT")}
           canDelete={hasPermission("PARTNERS_DELETE")}
           canView={hasPermission("PARTNERS_VIEW")}
+          columns={listPreference.preference.columns}
         />
       </div>
 
@@ -277,6 +283,7 @@ export default function PartnerPage() {
           onSaved={handlePartnerSaved}
         />
       )}
+      <ColumnSettingsDrawer open={columnsOpen} preference={listPreference.preference} loading={listPreference.loading} error={listPreference.error} onClose={() => setColumnsOpen(false)} onSave={listPreference.save} onReset={listPreference.reset} onChanged={() => setListReloadKey((value) => value + 1)} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
+import { columnIdentity, defaultListColumns, formatCustomFieldValue } from "../configurableView/listColumns.js";
 
 const cellClass = "h-[58px] border-r border-b border-[#e1e6e4] px-4 text-xs text-[#344247] last:border-r-0";
 const headerClass = "h-12 border-r border-b border-[#dbe1df] px-4 text-left text-[11px] font-medium text-[#445156] last:border-r-0";
@@ -20,6 +21,7 @@ export default function PartnerTableView({
   deletingId = null,
   loading = false,
   loadError = "",
+  columns = defaultListColumns.PARTNER,
 }) {
   const hasActions = canEdit || canDelete;
 
@@ -125,6 +127,14 @@ export default function PartnerTableView({
     </div>
   );
 
+  const coreBody = (column, partner) => {
+    if (column.key === "name") return partnerTemplate(partner);
+    if (column.key === "type") return partner.type === "COMPANY" ? "Cég" : "Magánszemély";
+    if (column.key === "website") return partner.website ? <a href={partner.website.startsWith("http") ? partner.website : `https://${partner.website}`} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="text-[#1f3035] underline hover:text-[#445156]">{partner.website}</a> : "—";
+    if (column.key === "createdAt") return partner.createdAt ? new Intl.DateTimeFormat("hu-HU").format(new Date(partner.createdAt)) : "—";
+    return partner[column.key] || "—";
+  };
+
   return (
     <div className="relative overflow-x-auto rounded-2xl border border-[#dbe1df] bg-white" aria-busy={loading}>
       {loading && (
@@ -164,55 +174,7 @@ export default function PartnerTableView({
           headerClassName={`${headerClass} w-14 px-5`}
           bodyClassName={`${cellClass} w-14 px-5`}
         />
-        <Column
-          field="name"
-          header="Partner neve"
-          body={partnerTemplate}
-          headerClassName={`${headerClass} w-[26%]`}
-          bodyClassName={`${cellClass} w-[26%]`}
-        />
-        <Column
-          field="type"
-          header="Típus"
-          body={(partner) => (partner.type === "COMPANY" ? "Cég" : "Magánszemély")}
-          headerClassName={`${headerClass} w-[15%]`}
-          bodyClassName={`${cellClass} w-[15%]`}
-        />
-        <Column
-          field="email"
-          header="Email"
-          body={(partner) => partner.email || "—"}
-          headerClassName={`${headerClass} w-[21%]`}
-          bodyClassName={`${cellClass} w-[21%]`}
-        />
-        <Column
-          field="phone"
-          header="Telefon"
-          body={(partner) => partner.phone || "—"}
-          headerClassName={`${headerClass} w-[17%]`}
-          bodyClassName={`${cellClass} w-[17%] whitespace-nowrap`}
-        />
-        <Column
-          field="website"
-          header="Weboldal"
-          body={(partner) =>
-            partner.website ? (
-              <a
-                href={partner.website.startsWith("http") ? partner.website : `https://${partner.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-[#1f3035] underline hover:text-[#445156]"
-              >
-                {partner.website}
-              </a>
-            ) : (
-              "—"
-            )
-          }
-          headerClassName={`${headerClass} w-[21%]`}
-          bodyClassName={`${cellClass} w-[21%]`}
-        />
+        {columns.map((column) => <Column key={columnIdentity(column)} field={column.type === "CORE" ? column.key : undefined} header={column.label} body={(partner) => column.type === "CORE" ? coreBody(column, partner) : formatCustomFieldValue(partner.customFieldValues?.[column.customFieldId], column.fieldType)} headerClassName={headerClass} bodyClassName={cellClass} />)}
         {hasActions && (
           <Column
             header="Műveletek"

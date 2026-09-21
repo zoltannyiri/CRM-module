@@ -2,8 +2,8 @@ import prisma from "../lib/prisma.js";
 import activityService from "./activityService.js";
 import customFieldService from "./customFieldService.js";
 
-async function getPartners({ organizationId }) {
-  const partners = await prisma.partner.findMany({
+async function getPartners({ organizationId, customFieldIds = [] }, client = prisma) {
+  const partners = await client.partner.findMany({
     where: {
       organizationId,
     },
@@ -14,7 +14,9 @@ async function getPartners({ organizationId }) {
       createdAt: "desc",
     },
   });
-  return partners;
+  if (!customFieldIds.length || !partners.length) return partners;
+  const values = await customFieldService.getBulkCustomFieldValues({ organizationId, entityType: "PARTNER", entityIds: partners.map(({ id }) => id), customFieldIds }, client);
+  return partners.map((partner) => ({ ...partner, customFieldValues: values.get(partner.id) || {} }));
 }
 
 async function getPartnersForExport({ organizationId, query = "", type = "ALL", sortDirection = "desc" }) {

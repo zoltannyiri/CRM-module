@@ -4,6 +4,7 @@ import { normalizeCustomFieldValues } from "../validation/customFieldValidation.
 import { hasPermission } from "../services/permissionService.js";
 import { isModuleEnabled } from "../services/organizationModuleService.js";
 import { normalizePartnerPayload } from "../validation/partnerValidation.js";
+import viewPreferenceService from "../services/viewPreferenceService.js";
 
 export const LEAD_STATUSES = new Set(["NEW", "CONTACTED", "QUALIFIED", "LOST"]);
 export const LEAD_SOURCES = new Set(["WEBSITE", "REFERRAL", "PHONE", "EMAIL", "SOCIAL", "OTHER"]);
@@ -86,7 +87,9 @@ async function getLeads(req, res, next) {
   try {
     const normalized = normalizeFilters(req.query);
     if (normalized.error) return res.status(400).json({ message: normalized.error });
-    return res.json(await leadService.getLeads({ organizationId: req.organization.id, includeConvertedPartner: await canViewConvertedPartner(req), ...normalized.data }));
+    const preference = await viewPreferenceService.getResolvedPreference({ organizationId: req.organization.id, organizationMemberId: req.membership.id, entityType: "LEAD" });
+    const customFieldIds = preference.columns.filter(({ type }) => type === "CUSTOM_FIELD").map(({ customFieldId }) => customFieldId);
+    return res.json(await leadService.getLeads({ organizationId: req.organization.id, includeConvertedPartner: await canViewConvertedPartner(req), customFieldIds, ...normalized.data }));
   } catch (error) { return next(error); }
 }
 

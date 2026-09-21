@@ -17,6 +17,7 @@ import pipelineRoutes from "./routes/pipelineRoutes.js";
 import followUpRoutes from "./routes/followUpRoutes.js";
 import offerRoutes from "./routes/offerRoutes.js";
 import customFieldRoutes from "./routes/customFieldRoutes.js";
+import viewPreferenceRoutes from "./routes/viewPreferenceRoutes.js";
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use("/api/leads", leadRoutes);
 app.use("/api/pipelines", pipelineRoutes);
 app.use("/api/follow-ups", followUpRoutes);
 app.use("/api/custom-fields", customFieldRoutes);
+app.use("/api/view-preferences", viewPreferenceRoutes);
 
 app.use((error, _req, res, _next) => {
   const candidateStatus = error?.statusCode ?? error?.status;

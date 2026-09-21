@@ -46,6 +46,7 @@ export default function PartnerListComponent({
   canEdit = false,
   canDelete = false,
   canView = true,
+  columns,
 }) {
   const { showSuccess, showError } = useToast();
   const [partners, setPartners] = useState([]);
@@ -180,6 +181,7 @@ export default function PartnerListComponent({
           deletingId={deletingId}
           loading={loading}
           loadError={loadError}
+          columns={columns}
         />
       ) : (
         <PartnerCardView

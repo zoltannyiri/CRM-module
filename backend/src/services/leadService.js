@@ -12,9 +12,9 @@ export function buildLeadSelect({ includeConvertedPartner = false } = {}) { retu
   ...(includeConvertedPartner && { convertedPartner: { select: { id: true, name: true } } }),
 }; }
 
-export async function getLeads({ organizationId, status, source, assignedMemberId, search = "", sortDirection = "desc", includeConvertedPartner = false }, client = prisma) {
+export async function getLeads({ organizationId, status, source, assignedMemberId, search = "", sortDirection = "desc", includeConvertedPartner = false, customFieldIds = [] }, client = prisma) {
   const term = search.trim();
-  return client.lead.findMany({
+  const leads = await client.lead.findMany({
     where: {
       organizationId,
       ...(status !== undefined && { status }),
@@ -25,6 +25,9 @@ export async function getLeads({ organizationId, status, source, assignedMemberI
     select: buildLeadSelect({ includeConvertedPartner }),
     orderBy: [{ createdAt: sortDirection }, { id: sortDirection }],
   });
+  if (!customFieldIds.length || !leads.length) return leads;
+  const values = await customFieldService.getBulkCustomFieldValues({ organizationId, entityType: "LEAD", entityIds: leads.map(({ id }) => id), customFieldIds }, client);
+  return leads.map((lead) => ({ ...lead, customFieldValues: values.get(lead.id) || {} }));
 }
 
 export async function getLeadById({ organizationId, leadId, includeConvertedPartner = false }, client = prisma) {

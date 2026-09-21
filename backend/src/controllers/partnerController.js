@@ -1,6 +1,7 @@
 import partnerService from '../services/partnerService.js';
 import customFieldService from '../services/customFieldService.js';
 import { normalizeCustomFieldValues } from '../validation/customFieldValidation.js';
+import viewPreferenceService from '../services/viewPreferenceService.js';
 import { buildPartnerExport, exportContentTypes } from '../services/partnerExportService.js';
 import { normalizePartnerPayload } from '../validation/partnerValidation.js';
 
@@ -12,8 +13,11 @@ function positiveId(value) {
 
 async function getPartners(req, res, next) {
   try {
+    const preference = await viewPreferenceService.getResolvedPreference({ organizationId: req.organization.id, organizationMemberId: req.membership.id, entityType: 'PARTNER' });
+    const customFieldIds = preference.columns.filter(({ type }) => type === 'CUSTOM_FIELD').map(({ customFieldId }) => customFieldId);
     const partners = await partnerService.getPartners({
       organizationId: req.organization.id,
+      customFieldIds,
     });
 
     return res.json(partners);

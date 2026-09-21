@@ -47,16 +47,52 @@ async function createCustomField({ organizationId, data }) {
 }
 
 async function updateCustomField({ organizationId, id, data }) {
-  const existing = await prisma.customField.findFirst({
-    where: { id, organizationId }
-  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.customField.findFirst({ where: { id, organizationId } });
+    if (!existing) return null;
 
-  if (!existing) return null;
+    if (Array.isArray(data.options) && Array.isArray(existing.options)) {
+      const removed = existing.options.filter((option) => !data.options.includes(option));
+      if (removed.length) {
+        const storedValues = await tx.customFieldValue.findMany({
+          where: { organizationId, customFieldId: id, value: { not: null } },
+          select: { value: true },
+        });
+        const used = existing.fieldType === 'MULTI_SELECT'
+          ? storedValues.some(({ value }) => {
+              try { return JSON.parse(value).some((item) => removed.includes(item)); } catch { return false; }
+            })
+          : storedValues.some(({ value }) => removed.includes(value));
+        if (used) {
+          const error = new Error('Használatban lévő választási lehetőség nem távolítható el.');
+          error.statusCode = 409;
+          error.code = 'CUSTOM_FIELD_OPTION_IN_USE';
+          throw error;
+        }
+      }
+    }
 
-  return prisma.customField.update({
-    where: { id },
-    data
+    return tx.customField.update({ where: { id }, data });
   });
+}
+
+async function getBulkCustomFieldValues({ organizationId, entityType, entityIds, customFieldIds }, client = prisma) {
+  if (!entityIds.length || !customFieldIds.length) return new Map();
+  const values = await client.customFieldValue.findMany({
+    where: {
+      organizationId,
+      entityType,
+      entityId: { in: entityIds },
+      customFieldId: { in: customFieldIds },
+    },
+    select: { entityId: true, customFieldId: true, value: true },
+  });
+  const byEntity = new Map();
+  for (const item of values) {
+    if (!byEntity.has(item.entityId)) byEntity.set(item.entityId, {});
+    byEntity.get(item.entityId)[item.customFieldId] = item.value;
+  }
+  return byEntity;
 }
 
 async function deactivateCustomField({ organizationId, id }) {
@@ -158,7 +194,8 @@ export {
   deactivateCustomField,
   getCustomFieldValues,
   setCustomFieldValues,
-  assertEntityExists
+  assertEntityExists,
+  getBulkCustomFieldValues,
 };
 
 export default {
@@ -170,5 +207,6 @@ export default {
   deactivateCustomField,
   getCustomFieldValues,
   setCustomFieldValues,
-  assertEntityExists
+  assertEntityExists,
+  getBulkCustomFieldValues,
 };

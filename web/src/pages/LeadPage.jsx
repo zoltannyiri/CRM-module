@@ -16,6 +16,8 @@ import {
 import Topbar from "../components/Topbar.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
+import ColumnSettingsDrawer from "../components/configurableView/ColumnSettingsDrawer.jsx";
+import { useListPreference } from "../hooks/useListPreference.js";
 
 const lightControl =
   "h-9 cursor-pointer rounded-md border border-[#d6dddc] bg-white px-3 text-xs font-medium text-[#344247] outline-none shadow-[0_1px_1px_rgba(26,39,35,.025)] hover:bg-[#f8f9f9] disabled:cursor-wait disabled:opacity-60";
@@ -38,6 +40,8 @@ export default function LeadPage() {
   const [form, setForm] = useState(null);
   const [conversionLead, setConversionLead] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const listPreference = useListPreference("LEAD", { enabled: !id });
   const canCreate = hasPermission("LEADS_CREATE");
 
   useEffect(() => {
@@ -199,6 +203,14 @@ export default function LeadPage() {
               aria-hidden="true"
             />
           </button>
+          <button
+            type="button"
+            onClick={() => setColumnsOpen(true)}
+            className={lightControl}
+          >
+            <i className="pi pi-table mr-2 text-[10px]" aria-hidden="true" />
+            Oszlopok
+          </button>
           {canCreate && (
             <button
               type="button"
@@ -228,9 +240,11 @@ export default function LeadPage() {
           canView={hasPermission("LEADS_VIEW")}
           canEdit={hasPermission("LEADS_EDIT")}
           canDelete={hasPermission("LEADS_DELETE")}
+          columns={listPreference.preference.columns}
         />
       </div>
       {drawer}
+      <ColumnSettingsDrawer open={columnsOpen} preference={listPreference.preference} loading={listPreference.loading} error={listPreference.error} onClose={() => setColumnsOpen(false)} onSave={listPreference.save} onReset={listPreference.reset} onChanged={() => setReloadKey((value) => value + 1)} />
     </div>
   );
 }

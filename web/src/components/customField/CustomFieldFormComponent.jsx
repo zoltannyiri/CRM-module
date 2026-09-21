@@ -71,14 +71,22 @@ function CustomFieldForm({ mode = 'create', field, entityType = 'LEAD', onClose,
     setError('');
 
     try {
-      const payload = { ...formData };
-      if (payload.fieldType === 'SELECT' || payload.fieldType === 'MULTI_SELECT') {
-        const opts = payload.optionsStr ? payload.optionsStr.split('\n').map(s => s.trim()).filter(Boolean) : [];
+      const payload = {
+        label: formData.label,
+        required: formData.required,
+        active: formData.active,
+        sortOrder: Number(formData.sortOrder),
+        placeholder: formData.placeholder?.trim() || null,
+        helpText: formData.helpText?.trim() || null,
+        defaultValue: formData.defaultValue === '' ? null : formData.defaultValue,
+      };
+      if (!isEditing) Object.assign(payload, { entityType: formData.entityType, key: formData.key, fieldType: formData.fieldType });
+      if (formData.fieldType === 'SELECT' || formData.fieldType === 'MULTI_SELECT') {
+        const opts = formData.optionsStr ? formData.optionsStr.split('\n').map(s => s.trim()) : [];
         payload.options = opts;
       } else {
         payload.options = null;
       }
-      delete payload.optionsStr;
 
       let response;
       if (isEditing) {

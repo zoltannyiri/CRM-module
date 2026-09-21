@@ -2,13 +2,12 @@ import "dotenv/config";
 import assert from "node:assert/strict";
 import { test, mock } from "node:test";
 import { randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { Pool } from "pg";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import express from "express";
 import { once } from "node:events";
+import { applyMigrations } from "./helpers/applyMigrations.js";
 
 test("Custom Fields real database tenant, permissions, validation and values", {
   skip: process.env.CUSTOM_FIELDS_DB_TESTS !== "1",
@@ -19,15 +18,7 @@ test("Custom Fields real database tenant, permissions, validation and values", {
   let prisma;
   try {
     await pool.query(`CREATE SCHEMA "${schema}"`);
-    const url = new URL(process.env.DATABASE_URL);
-    url.searchParams.set("schema", schema);
-    const { stdout } = await promisify(execFile)(process.execPath, [
-      "node_modules/prisma/build/index.js", "migrate", "deploy"
-    ], {
-      env: { ...process.env, DATABASE_URL: url.toString(), PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1" },
-      timeout: 60000,
-    });
-    assert.match(stdout, /All migrations have been successfully applied/);
+    await applyMigrations(pool, schema);
     prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }, { schema }) });
     mock.module("../src/lib/prisma.js", { defaultExport: prisma });
 
@@ -190,6 +181,50 @@ test("Custom Fields real database tenant, permissions, validation and values", {
           token: foreignToken, method: "PATCH", body: { label: "Hacked" }
         });
         assert.equal(status, 404);
+      });
+
+      await t.test("11a. SELECT definition PATCH validates persisted type, options and defaults", async () => {
+        const created = await req("/api/custom-fields", {
+          method: "POST",
+          body: { entityType: "LEAD", key: "industry_hardened", label: "Iparág", fieldType: "SELECT", options: [" IT ", "Építőipar"], defaultValue: "IT" }
+        });
+        assert.equal(created.status, 201);
+        assert.deepEqual(created.body.options, ["IT", "Építőipar"]);
+
+        const valid = await req(`/api/custom-fields/${created.body.id}`, { method: "PATCH", body: { options: ["IT", "Kereskedelem"] } });
+        assert.equal(valid.status, 200);
+        assert.deepEqual(valid.body.options, ["IT", "Kereskedelem"]);
+
+        for (const body of [
+          { options: [] },
+          { options: ["IT", " IT "] },
+          { options: ["IT"], defaultValue: "Nincs" },
+        ]) {
+          const response = await req(`/api/custom-fields/${created.body.id}`, { method: "PATCH", body });
+          assert.equal(response.status, 400);
+        }
+      });
+
+      await t.test("11b. invalid NUMBER and BOOLEAN defaults return 400", async () => {
+        for (const body of [
+          { entityType: "LEAD", key: "bad_number_default", label: "Szám", fieldType: "NUMBER", defaultValue: "nem szám" },
+          { entityType: "LEAD", key: "bad_boolean_default", label: "Logikai", fieldType: "BOOLEAN", defaultValue: "igen" },
+        ]) {
+          const response = await req("/api/custom-fields", { method: "POST", body });
+          assert.equal(response.status, 400);
+        }
+      });
+
+      await t.test("11c. removing an option already used by an entity is blocked without deleting data", async () => {
+        const field = await prisma.customField.create({
+          data: { organizationId: org.id, entityType: "LEAD", key: "used_industry", label: "Használt iparág", fieldType: "SELECT", options: ["IT", "Építőipar"] }
+        });
+        const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Option használó" } });
+        await prisma.customFieldValue.create({ data: { organizationId: org.id, customFieldId: field.id, entityType: "LEAD", entityId: lead.id, value: "IT" } });
+        const response = await req(`/api/custom-fields/${field.id}`, { method: "PATCH", body: { options: ["Építőipar"] } });
+        assert.equal(response.status, 409);
+        assert.equal(response.body.code, "CUSTOM_FIELD_OPTION_IN_USE");
+        assert.equal((await prisma.customFieldValue.findUnique({ where: { customFieldId_entityId: { customFieldId: field.id, entityId: lead.id } } })).value, "IT");
       });
 
       await t.test("12. deactivate requires CUSTOM_FIELDS_DELETE", async () => {
